@@ -278,7 +278,11 @@ export const atlasSampling = {{ filter: sampleMode }};
 
 export function rectFor(frameId: string): {{ x: number; y: number; w: number; h: number }} {{
   const f = frameById(frameId);
-  return {{ x: f.x, y: f.y, w: f.w, h: f.h }};
+  // Inset de medio texel: evita sangrado del frame vecino del atlas cuando el
+  // muestreo nearest cae fuera del rect (clamp-to-edge) por redondeo del
+  // escalado destino (p. ej. 64px de frame a 84px de dispositivo con DPR 2.625).
+  const e = 0.5;
+  return {{ x: f.x + e, y: f.y + e, w: f.w - 2 * e, h: f.h - 2 * e }};
 }}
 
 export function useAtlasImage() {{
@@ -295,6 +299,12 @@ export interface SpriteSpec {{
 export function useAtlasSprites(specs: readonly SpriteSpec[], scale = frameScale) {{
   const image = useAtlasImage();
   const rects = specs.map((s) => rectFor(s.id));
+  const frames = specs.map((s) => frameById(s.id));
+  // Compensa el inset de rectFor: ajusta la escala para que el tamaño destino
+  // (scale * framePx) no cambie pese a que el source recortado es 2e px menor.
+  const scales = specs.map(
+    (s, i) => (s.scale ?? scale) * (frames[i].w / rects[i].w),
+  );
   const sprites = useRectBuffer(specs.length, (rect, i) => {{
     'worklet';
     const f = rects[i];
@@ -303,7 +313,7 @@ export function useAtlasSprites(specs: readonly SpriteSpec[], scale = frameScale
   const transforms = useRSXformBuffer(specs.length, (xform, i) => {{
     'worklet';
     const s = specs[i];
-    xform.set(s.scale ?? scale, 0, s.x, s.y);
+    xform.set(scales[i], 0, s.x, s.y);
   }});
   return {{ image, sprites, transforms, sampling: atlasSampling }};
 }}

@@ -70,3 +70,25 @@ def test_index_ts_references_atlas_and_types(tmp_path: Path) -> None:
     assert "export function useAtlasGrid" in src
     assert "useRectBuffer" in src and "useRSXformBuffer" in src
     assert "{ filter: sampleMode }" in src
+    assert "useRectBuffer" in src and "useRSXformBuffer" in src
+    assert "{ filter: sampleMode }" in src
+
+
+def test_index_ts_inset_and_scale_compensation(tmp_path: Path) -> None:
+    """Regresión del fix de sangrado entre frames (DPR no entero).
+
+    La paridad byte-a-byte entre corridas no detecta cambios de plantilla
+    (los assets viejos de la demo quedaron obsoletos sin que fallara nada).
+    Esto verifica el contenido del contrato: inset de medio texel en rectFor
+    contra el bleed del atlas con muestreo nearest, y compensación de escala
+    en useAtlasSprites para que el destino siga siendo scale * framePx.
+    """
+    out = tmp_path / "out"
+    _generate(SPEC, out, None, False)
+    src = (out / "index.ts").read_text()
+    # rectFor: inset de medio texel
+    assert "const e = 0.5;" in src
+    assert "x: f.x + e, y: f.y + e, w: f.w - 2 * e, h: f.h - 2 * e" in src
+    # useAtlasSprites: escala compensada (frames[i].w / rects[i].w) aplicada
+    assert "(frames[i].w / rects[i].w)" in src
+    assert "xform.set(scales[i], 0, s.x, s.y);" in src
