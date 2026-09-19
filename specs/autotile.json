@@ -1,0 +1,10 @@
+{
+  "name": "terrain47",
+  "seed": 1337,
+  "target": "expo-rn-skia",
+  "files": { "atlas": "atlas.png" },
+  "layout": { "framePx": 64, "cols": 8, "tileLogical": 32, "sample": "nearest" },
+  "items": [
+    { "id": "terrain", "generator": "terrain", "frames": 47, "autotile": "47" }
+  ]
+}

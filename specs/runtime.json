@@ -1,0 +1,15 @@
+{
+  "name": "demo_runtime",
+  "seed": 1337,
+  "target": "expo-rn-skia",
+  "files": { "atlas": "atlas.png" },
+  "layout": { "framePx": 64, "cols": 4, "tileLogical": 32, "sample": "nearest" },
+  "items": [
+    { "id": "tiles", "generator": "terrain", "frames": 4 }
+  ],
+  "runtime": {
+    "freq": 0.05,
+    "octaves": 4,
+    "tileable": true
+  }
+}

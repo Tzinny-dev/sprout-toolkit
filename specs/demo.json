@@ -1,0 +1,12 @@
+{
+  "name": "demo_atlas",
+  "seed": 1337,
+  "target": "expo-rn-skia",
+  "files": { "atlas": "atlas.png" },
+  "layout": { "framePx": 64, "cols": 4, "tileLogical": 32, "sample": "nearest" },
+  "items": [
+    { "id": "hero", "generator": "blob_walk", "frames": 8 },
+    { "id": "tiles", "generator": "terrain", "frames": 8 }
+  ],
+  "animations": { "walk": { "frames": "hero", "fps": 8, "loop": true } }
+}
