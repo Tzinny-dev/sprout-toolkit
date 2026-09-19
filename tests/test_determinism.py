@@ -92,3 +92,16 @@ def test_index_ts_inset_and_scale_compensation(tmp_path: Path) -> None:
     # useAtlasSprites: escala compensada (frames[i].w / rects[i].w) aplicada
     assert "(frames[i].w / rects[i].w)" in src
     assert "xform.set(scales[i], 0, s.x, s.y);" in src
+
+
+def test_index_ts_batch_helpers(tmp_path: Path) -> None:
+    """Modo batch imperativo (§11): drawAtlas en un SkPicture."""
+    out = tmp_path / "out"
+    _generate(SPEC, out, None, False)
+    src = (out / "index.ts").read_text()
+    assert "export function makeStaticAtlasPicture" in src
+    assert "export function useAtlasBatch" in src
+    assert "canvas.drawAtlas(" in src
+    assert "Skia.PictureRecorder()" in src
+    assert "finishRecordingAsPicture()" in src
+    assert "export type SpriteSpecData" in src
