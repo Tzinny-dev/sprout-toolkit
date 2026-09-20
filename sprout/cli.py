@@ -1,9 +1,9 @@
-"""CLI `imgi`: generación procedural determinista de assets 2D para Expo.
+"""CLI `sprout`: generación procedural determinista de assets 2D para Expo.
 
 Uso:
-  imgi generate specs/demo.json --out ../demo/assets/procgen
-  imgi batch specs/ --out ../demo/assets/procgen
-  imgi validate specs/demo.json
+  sprout generate specs/demo.json --out ../demo/assets/procgen
+  sprout batch specs/ --out ../demo/assets/procgen
+  sprout validate specs/demo.json
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ from .exporter import (
 from .spec import Spec, SpecError, load_spec
 
 app = typer.Typer(add_completion=False, no_args_is_help=True,
-                  help="imgi — assets 2D procedurales deterministas para Expo + react-native-skia.")
+                  help="sprout — assets 2D procedurales deterministas para Expo + react-native-skia.")
 
 
 def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
@@ -149,7 +149,7 @@ def validate(spec: Path = typer.Argument(..., help="spec.json a validar")) -> No
 @app.callback(invoke_without_command=True)
 def _version(version: bool = typer.Option(False, "--version", help="muestra la versión")) -> None:
     if version:
-        typer.echo(f"imgi {__version__}")
+        typer.echo(f"sprout {__version__}")
         raise typer.Exit()
 
 

@@ -5,7 +5,7 @@ import json
 import zlib
 from pathlib import Path
 
-from imgi.cli import _generate
+from sprout.cli import _generate
 
 SPEC = Path(__file__).resolve().parents[1] / "specs" / "demo.json"
 
@@ -46,7 +46,7 @@ def test_manifest_shape(tmp_path: Path) -> None:
     out = tmp_path / "out"
     _generate(SPEC, out, None, False)
     m = json.loads((out / "manifest.json").read_text())
-    assert m["schema"] == "imgi/manifest@0"
+    assert m["schema"] == "sprout/manifest@0"
     assert len(m["frames"]) == 16
     assert m["anim"]["walk"]["frames"] == [f"hero_{i:02d}" for i in range(8)]
     assert set(m["tiles"]["ids"]) == {f"tiles_{i:02d}" for i in range(8)}

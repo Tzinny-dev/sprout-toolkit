@@ -1,6 +1,6 @@
 """Autotiling 16 / 47 — reducción canónica de máscaras de vecindad 8-bit.
 
-Bits (convención canónica imgi, ver INVESTIGACION.md §5.3)::
+Bits (convención canónica sprout, ver INVESTIGACION.md §5.3)::
 
     N=1, NE=2, E=4, SE=8, S=16, SW=32, W=64, NW=128
 

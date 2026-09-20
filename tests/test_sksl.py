@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from imgi.cli import _generate
-from imgi.exporter import build_shader
-from imgi.spec import SpecError, load_spec
+from sprout.cli import _generate
+from sprout.exporter import build_shader
+from sprout.spec import SpecError, load_spec
 
 SPEC = Path(__file__).resolve().parents[1] / "specs" / "runtime.json"
 DEMO = Path(__file__).resolve().parents[1] / "specs" / "demo.json"

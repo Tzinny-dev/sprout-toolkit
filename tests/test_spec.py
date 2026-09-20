@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import pytest
 
-from imgi.spec import SpecError, load_spec
+from sprout.spec import SpecError, load_spec
 
 
 def _write(tmp_path, spec: dict):

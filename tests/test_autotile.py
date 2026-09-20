@@ -9,10 +9,10 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from imgi import autotile
-from imgi.cli import _generate
-from imgi.generators.terrain import Terrain, _tile_land as _land
-from imgi.spec import SpecError, load_spec
+from sprout import autotile
+from sprout.cli import _generate
+from sprout.generators.terrain import Terrain, _tile_land as _land
+from sprout.spec import SpecError, load_spec
 
 SPEC = Path(__file__).resolve().parents[1] / "specs" / "autotile.json"
 
@@ -116,7 +116,7 @@ def _tile_edge_continuity(size: int = 47, frame_px: int = 24,
                 | b(1, -1) * autotile.SW | b(0, -1) * autotile.W
                 | b(-1, -1) * autotile.NW)
 
-    from imgi.generators.terrain import _tile_land
+    from sprout.generators.terrain import _tile_land
     random.seed(1)
     bad = 0
     for _ in range(trials):
