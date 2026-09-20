@@ -1,5 +1,10 @@
 # sprout-toolkit
 
+[![PyPI version](https://img.shields.io/pypi/v/sprout-toolkit)](https://pypi.org/project/sprout-toolkit/)
+[![CI](https://github.com/Tzinny-dev/sprout-toolkit/actions/workflows/tests.yml/badge.svg)](https://github.com/Tzinny-dev/sprout-toolkit/actions/workflows/tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+
 **SPROUT** — Skia Procedural Rendering & Optimization Unified Toolkit
 
 > Grow your 2D assets procedurally.
