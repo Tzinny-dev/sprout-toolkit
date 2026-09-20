@@ -3,15 +3,33 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "sprout"
+name = "sprout-toolkit"
 version = "0.1.0"
 description = "Generación procedural determinista de assets 2D para Expo + react-native-skia"
+readme = "README.md"
+authors = [{ name = "Tzinny" }]
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
+keywords = ["procgen", "sprites", "spritesheet", "skia", "expo", "react-native", "game-dev"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Games/Entertainment",
+    "Topic :: Multimedia :: Graphics",
+    "Topic :: Software Development :: Code Generators",
+]
 dependencies = [
     "pillow>=10",
     "typer>=0.12",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Tzinny-dev/sprout-toolkit"
+Repository = "https://github.com/Tzinny-dev/sprout-toolkit"
+Issues = "https://github.com/Tzinny-dev/sprout-toolkit/issues"
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
