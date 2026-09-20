@@ -7,10 +7,12 @@ from PIL import Image, ImageDraw
 
 from sprout.exporter import (
     apply_png_mode,
+    build_sheet,
     build_texturepacker,
     compute_mipmap_meta,
     write_mipmap_files,
 )
+from sprout.generators.base import FrameData
 from sprout.spec import load_spec
 
 SPECS = Path(__file__).resolve().parents[1] / "specs"
@@ -105,3 +107,20 @@ def test_write_mipmap_files_creates_expected_pngs(tmp_path: Path) -> None:
         assert p.is_file()
         with Image.open(p) as img:
             assert img.size == (lvl["w"], lvl["h"])
+
+
+# ── build_sheet: anchor opt-in por frame ──────────────────────────────────
+def test_build_sheet_includes_anchor_when_present() -> None:
+    spec = load_spec(SPECS / "props.json")
+    img = Image.new("RGBA", (spec.layout.frame_px, spec.layout.frame_px), (0, 0, 0, 0))
+    frames_with_anchor = [FrameData(id="rock_00", image=img, meta={"anchor": {"x": 10, "y": 20}})]
+    _, records = build_sheet(spec, [frames_with_anchor])
+    assert records[0]["anchor"] == {"x": 10, "y": 20}
+
+
+def test_build_sheet_omits_anchor_when_absent() -> None:
+    spec = load_spec(SPECS / "props.json")
+    img = Image.new("RGBA", (spec.layout.frame_px, spec.layout.frame_px), (0, 0, 0, 0))
+    frames_without_anchor = [FrameData(id="spark_00", image=img)]
+    _, records = build_sheet(spec, [frames_without_anchor])
+    assert "anchor" not in records[0]

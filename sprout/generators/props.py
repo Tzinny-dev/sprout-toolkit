@@ -11,6 +11,12 @@ Parámetros de spec (item.params):
     kind   : "rock" | "bush" | "chest" | "mushroom" | "flower"  (default "rock")
     fill   : [r, g, b]  color de relleno (override opcional)
     outline: [r, g, b]  color de contorno (override opcional)
+
+Cada frame lleva además un anchor point en ``meta["anchor"]`` — el punto
+donde el objeto "toca el suelo", en píxeles locales del frame (mismo
+sistema que ``w``/``h`` en el manifest). Se calcula desde el bbox alpha real
+ya renderizado (no una fórmula fija por kind), así que sigue la forma
+efectiva del sprite sin mantenimiento manual por kind.
 """
 from __future__ import annotations
 
@@ -30,6 +36,18 @@ def _cell(i: int, j: int, seed: int) -> float:
 def _rnd(seed: int, i: int) -> float:
     """Valor ubicuo [0, 1) para variación por variante."""
     return _cell(i, 0, seed)
+
+
+def _anchor_from_alpha(img: Image.Image) -> dict:
+    """Punto de apoyo en el suelo: centro horizontal + borde inferior del
+    bbox alpha ya renderizado. `getbbox()` devuelve (x0,y0,x1,y1) con
+    x1/y1 exclusivos, así que y1 cae justo debajo del último píxel opaco —
+    lectura natural como "línea de suelo". Frame vacío -> centro del frame."""
+    bbox = img.getchannel("A").getbbox()
+    if bbox is None:
+        return {"x": img.width / 2, "y": img.height / 2}
+    x0, y0, x1, y1 = bbox
+    return {"x": (x0 + x1) / 2, "y": y1}
 
 
 class Props(Generator):
@@ -167,5 +185,5 @@ class Props(Generator):
             cx = cy = frame_px / 2
             r = frame_px * 0.35
             getattr(self, f"_{kind}")(d, cx, cy, r, vs, palette)
-            out.append(FrameData(id="", image=img))
+            out.append(FrameData(id="", image=img, meta={"anchor": _anchor_from_alpha(img)}))
         return out

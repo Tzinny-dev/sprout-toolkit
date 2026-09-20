@@ -65,10 +65,13 @@ def build_sheet(spec: Spec, items_frames: list[list[FrameData]]) -> tuple[Image.
             col, row = i % cols, i // cols
             x, y = col * frame, row * frame
             sheet.paste(fr.image, (x, y), fr.image if fr.image.mode == "RGBA" else None)
-            records.append({
+            record = {
                 "id": fr.id, "col": col, "row": row,
                 "x": x, "y": y, "w": frame, "h": frame,
-            })
+            }
+            if "anchor" in fr.meta:
+                record["anchor"] = fr.meta["anchor"]
+            records.append(record)
             i += 1
     return sheet, records
 
@@ -313,6 +316,7 @@ export interface Frame {{
   y: number;
   w: number;
   h: number;
+  anchor?: {{ x: number; y: number }};
 }}
 
 export interface Anim {{

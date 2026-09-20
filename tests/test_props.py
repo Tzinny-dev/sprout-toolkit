@@ -6,6 +6,7 @@ import zlib
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from sprout.cli import _generate
 from sprout.generators import GENERATORS
@@ -93,6 +94,36 @@ def test_size_scales_with_frame_px() -> None:
         assert frames[0].image.size == (size, size)
 
 
+# ── Anchor points (v2) ────────────────────────────────────────────────────
+def test_anchor_present_and_within_bounds() -> None:
+    for kind in ALL_KINDS:
+        frames = Props().generate(1, 1, 64, {"kind": kind})
+        anchor = frames[0].meta["anchor"]
+        assert 0 <= anchor["x"] <= 64
+        assert 0 <= anchor["y"] <= 64
+
+
+def test_anchor_deterministic() -> None:
+    a = Props().generate(42, 1, 64, {"kind": "bush"})
+    b = Props().generate(42, 1, 64, {"kind": "bush"})
+    assert a[0].meta["anchor"] == b[0].meta["anchor"]
+
+
+def test_anchor_follows_actual_shape() -> None:
+    """El anchor sigue el bbox alpha real, no una constante por kind: el
+    tallo de `mushroom` cae más abajo que el cuerpo compacto de `rock`."""
+    rock = Props().generate(1, 1, 64, {"kind": "rock"})[0].meta["anchor"]
+    mushroom = Props().generate(1, 1, 64, {"kind": "mushroom"})[0].meta["anchor"]
+    assert mushroom["y"] > rock["y"]
+
+
+def test_anchor_falls_back_to_center_on_empty_frame() -> None:
+    from sprout.generators.props import _anchor_from_alpha
+
+    empty = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    assert _anchor_from_alpha(empty) == {"x": 32.0, "y": 32.0}
+
+
 # ── Pipeline completo (spec -> atlas + manifest + index.ts) ─────────────
 def test_spec_generates_all_outputs(tmp_path: Path) -> None:
     out = tmp_path / "out"
@@ -108,6 +139,16 @@ def test_spec_deterministic(tmp_path: Path) -> None:
     _generate(SPEC, b, None, False)
     assert _crc(a / "atlas.png") == _crc(b / "atlas.png")
     assert (a / "manifest.json").read_bytes() == (b / "manifest.json").read_bytes()
+
+
+def test_manifest_frames_have_anchor(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    _generate(SPEC, out, None, False)
+    m = json.loads((out / "manifest.json").read_text())
+    for f in m["frames"]:
+        assert "anchor" in f, f"frame '{f['id']}' sin anchor"
+        assert isinstance(f["anchor"]["x"], (int, float))
+        assert isinstance(f["anchor"]["y"], (int, float))
 
 
 def test_manifest_frames_and_shape(tmp_path: Path) -> None:
