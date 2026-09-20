@@ -10,11 +10,12 @@ import json
 import zlib
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageFont
 
 from . import __version__, autotile, sksl
 from .generators.base import FrameData
 from .generators import get_generator
+from .generators.font import resolve_font_path
 from .spec import Spec
 
 
@@ -85,9 +86,30 @@ def build_autotile_map(spec: Spec, items_frames: list[list[FrameData]]) -> dict:
     return {"bitmask": autotile.BITMASK, "items": items} if items else {}
 
 
+def build_font_map(spec: Spec, items_frames: list[list[FrameData]]) -> dict:
+    """Bloque `font` del manifest: item -> {ascent, descent, glyphs}."""
+    items: dict[str, dict] = {}
+    for item, frames in zip(spec.items, items_frames, strict=True):
+        if item.generator != "font":
+            continue
+        font_path = resolve_font_path(item.params)
+        size = int(item.params.get("size", spec.layout.frame_px * 0.6))
+        face = ImageFont.truetype(font_path, size)
+        ascent, descent = face.getmetrics()
+        items[item.id] = {
+            "ascent": ascent,
+            "descent": descent,
+            "glyphs": {
+                fr.meta["char"]: {"id": fr.id, "advance": fr.meta["advance"]}
+                for fr in frames
+            },
+        }
+    return {"items": items} if items else {}
+
+
 def build_manifest(spec: Spec, records: list[dict], atlas_name: str,
                    sheet: Image.Image, spec_path: str, autotile_map: dict | None = None,
-                   shader_block: dict | None = None) -> dict:
+                   shader_block: dict | None = None, font_map: dict | None = None) -> dict:
     anim: dict[str, dict] = {}
     for name, a in spec.animations.items():
         item = next(it for it in spec.items if it.id == a.frames)
@@ -124,6 +146,7 @@ def build_manifest(spec: Spec, records: list[dict], atlas_name: str,
         },
         **({"autotile": autotile_map} if autotile_map else {}),
         **({"shader": shader_block} if shader_block else {}),
+        **({"font": font_map} if font_map else {}),
     }
 
 
@@ -244,6 +267,21 @@ export interface ShaderBlock {{
   uniforms: ShaderUniforms;
 }}
 
+export interface GlyphEntry {{
+  id: string;
+  advance: number;
+}}
+
+export interface FontItem {{
+  ascent: number;
+  descent: number;
+  glyphs: Record<string, GlyphEntry>;
+}}
+
+export interface FontBlock {{
+  items: Record<string, FontItem>;
+}}
+
 export interface Manifest {{
   schema: string;
   name: string;
@@ -256,6 +294,7 @@ export interface Manifest {{
   tiles: {{ ids: string[] }};
   autotile?: Autotile;
   shader?: ShaderBlock;
+  font?: FontBlock;
   meta: unknown;
 }}
 
@@ -510,5 +549,37 @@ export function autotileFrame(mask: number, item = 'tiles'): Frame {{
   const id = entry.mask[String(m)];
   if (!id) throw new Error(`autotile sin frame para máscara ${{m}} en ${{item}}`);
   return frameById(id);
+}}
+
+export function glyphFrame(char: string, item = 'font'): Frame {{
+  const fontBlock = manifest.font;
+  if (!fontBlock) throw new Error('manifest sin bloque font');
+  const entry = fontBlock.items[item];
+  if (!entry) throw new Error(`font desconocido: ${{item}}`);
+  const glyph = entry.glyphs[char];
+  if (!glyph) throw new Error(`glifo sin frame para caracter '${{char}}' en ${{item}}`);
+  return frameById(glyph.id);
+}}
+
+/** Arma SpriteSpec[] para un texto, avanzando en x según el ancho de cada glifo. */
+export function textSprites(
+  text: string,
+  origin: {{ x: number; y: number }},
+  item = 'font',
+  scale = frameScale,
+): SpriteSpec[] {{
+  const fontBlock = manifest.font;
+  if (!fontBlock) throw new Error('manifest sin bloque font');
+  const entry = fontBlock.items[item];
+  if (!entry) throw new Error(`font desconocido: ${{item}}`);
+  const specs: SpriteSpec[] = [];
+  let x = origin.x;
+  for (const ch of text) {{
+    const glyph = entry.glyphs[ch];
+    if (!glyph) continue;
+    specs.push({{ id: glyph.id, x, y: origin.y, scale }});
+    x += glyph.advance * scale;
+  }}
+  return specs;
 }}
 """

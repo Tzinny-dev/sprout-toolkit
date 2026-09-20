@@ -10,6 +10,7 @@ from __future__ import annotations
 
 from .base import FrameData, Generator
 from .blob_walk import BlobWalk
+from .font import Font
 from .particles import Particles
 from .props import Props
 from .terrain import Terrain
@@ -21,6 +22,7 @@ GENERATORS: dict[str, type[Generator]] = {
     Particles.id: Particles,
     BlobWalk.id: BlobWalk,
     Ui.id: Ui,
+    Font.id: Font,
 }
 
 

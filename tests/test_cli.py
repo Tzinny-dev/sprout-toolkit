@@ -181,9 +181,9 @@ def test_lint_invalid_spec_exits_1(tmp_path: Path) -> None:
 def test_lint_warnings_flags_empty_frames() -> None:
     """Unitario: `_lint_warnings` detecta frames totalmente transparentes
     sin depender de que algún generador real produzca uno vacío."""
-    spec = load_spec(SPECS / "ui.json")
+    spec = load_spec(SPECS / "ui.json")  # 3 items: btn, slider, panel
     empty = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-    items_frames = [[FrameData(id="ghost_00", image=empty)]]
+    items_frames = [[], [], [FrameData(id="ghost_00", image=empty)]]
     warnings = _lint_warnings(spec, items_frames)
     empty_warning = next(w for w in warnings if w["check"] == "empty_frames")
     assert empty_warning["ids"] == ["ghost_00"]
@@ -192,9 +192,9 @@ def test_lint_warnings_flags_empty_frames() -> None:
 def test_lint_ignores_rgb_frames_without_alpha() -> None:
     """Los tiles RGB (terrain sin autotile) no tienen canal alpha: no deben
     dispararse como falso positivo de `empty_frames`."""
-    spec = load_spec(SPECS / "ui.json")
+    spec = load_spec(SPECS / "ui.json")  # 3 items: btn, slider, panel
     rgb_frame = Image.new("RGB", (64, 64), (10, 10, 10))
-    items_frames = [[FrameData(id="tile_00", image=rgb_frame)]]
+    items_frames = [[], [], [FrameData(id="tile_00", image=rgb_frame)]]
     warnings = _lint_warnings(spec, items_frames)
     assert not any(w["check"] == "empty_frames" for w in warnings)
 
@@ -203,6 +203,15 @@ def test_lint_terrain_spec_no_false_positive() -> None:
     """`demo.json` mezcla frames RGBA (hero) y RGB (tiles): no debe fallar
     ni marcar falsos positivos de frames vacíos."""
     result = runner.invoke(app, ["lint", "--json", str(SPECS / "demo.json")])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.stdout)
+    assert not any(w["check"] == "empty_frames" for w in data["warnings"])
+
+
+def test_lint_font_spec_ignores_blank_space_glyph() -> None:
+    """El espacio en `font.json` es un frame vacío a propósito: `lint` no
+    debe marcarlo como `empty_frames`."""
+    result = runner.invoke(app, ["lint", "--json", str(SPECS / "font.json")])
     assert result.exit_code == 0, result.output
     data = json.loads(result.stdout)
     assert not any(w["check"] == "empty_frames" for w in data["warnings"])

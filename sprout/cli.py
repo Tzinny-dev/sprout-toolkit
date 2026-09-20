@@ -21,6 +21,7 @@ import typer
 from . import __version__
 from .exporter import (
     build_autotile_map,
+    build_font_map,
     build_manifest,
     build_shader,
     build_sheet,
@@ -52,10 +53,11 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
     index_path = out / "index.ts"
 
     autotile_map = build_autotile_map(spec, frames)
+    font_map = build_font_map(spec, frames)
     shader_source, shader_block = build_shader(spec)
     shader_path = out / shader_filename(spec) if shader_block else None
     manifest = build_manifest(spec, records, atlas_name, sheet, str(spec_path),
-                              autotile_map, shader_block)
+                              autotile_map, shader_block, font_map)
 
     if skip_existing and atlas_path.is_file() and manifest_path.is_file() and index_path.is_file():
         if shader_block and not (shader_path and shader_path.is_file()):
@@ -236,7 +238,12 @@ def _lint_warnings(spec: Spec, items_frames: list[list[FrameData]]) -> list[dict
         })
 
     empty_ids = [
-        fr.id for frames in items_frames for fr in frames
+        fr.id
+        for item, frames in zip(spec.items, items_frames, strict=True)
+        # el generador `font` produce glifos vacíos a propósito (el espacio
+        # no pinta ningún píxel) — no es un frame desperdiciado.
+        if item.generator != "font"
+        for fr in frames
         # los tiles RGB (p. ej. terrain sin autotile) son opacos por diseño
         # y no tienen canal alpha que consultar.
         if fr.image.mode == "RGBA" and fr.image.getchannel("A").getbbox() is None

@@ -1,0 +1,10 @@
+{
+  "name": "font_atlas",
+  "seed": 1,
+  "target": "expo-rn-skia",
+  "files": { "atlas": "atlas.png" },
+  "layout": { "framePx": 48, "cols": 10, "tileLogical": 24, "sample": "nearest" },
+  "items": [
+    { "id": "hud", "generator": "font", "frames": 95 }
+  ]
+}
