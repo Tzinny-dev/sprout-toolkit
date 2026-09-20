@@ -147,7 +147,10 @@ pip install -e ".[test]"
 pytest -q
 ```
 
-CI (`.github/workflows/tests.yml`) runs the full suite on every push/PR.
+CI (`.github/workflows/tests.yml`) runs the full suite on every push/PR,
+across Python 3.10–3.13.
+Publishing to PyPI is manual (`.github/workflows/publish.yml`, trusted
+publishing via OIDC) — see [CHANGELOG](CHANGELOG.md).
 
 ## Credits
 

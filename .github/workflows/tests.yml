@@ -8,10 +8,18 @@ on:
 jobs:
   pytest:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      # Must cover the full `requires-python = ">=3.10"` range declared in
+      # pyproject.toml. 3.14 is intentionally excluded: Pillow/Typer may not
+      # ship wheels for it yet, which would fail CI for reasons unrelated to
+      # our code. Revisit when the 3.14 wheels exist.
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[test]"
       - run: pytest -q

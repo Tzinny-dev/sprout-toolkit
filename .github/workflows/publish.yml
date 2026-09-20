@@ -1,0 +1,68 @@
+# Publish sprout-toolkit to PyPI.
+#
+# Trigger: MANUAL ONLY (workflow_dispatch) with an explicit version input.
+# Tag-triggered publishing is deliberately NOT used: pushing a tag is too
+# easy to do by accident, and PyPI versions are immutable — a mistaken
+# publish can never be undone or replaced.
+#
+# Authentication: trusted publishing (OIDC), no API tokens.
+# One-time setup on https://pypi.org/manage/project/sprout-toolkit/settings/publishing/:
+#   publisher = GitHub, owner = Tzinny-dev, repo = sprout-toolkit,
+#   workflow = publish.yml, environment = pypi
+# The `environment: pypi` below must match the environment name registered
+# on PyPI (an environment protection rule requiring manual approval is
+# recommended as a second safety net).
+#
+# The `check-version` job fails the run if the version being released
+# already exists on PyPI, so re-running a release by mistake is a no-op
+# instead of a confusing "file already exists" upload error.
+
+name: publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release (must match pyproject.toml, e.g. 0.2.0)"
+        required: true
+        type: string
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version matches pyproject.toml
+        run: |
+          PKG_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          echo "pyproject version: $PKG_VERSION / requested: ${{ inputs.version }}"
+          test "$PKG_VERSION" = "${{ inputs.version }}" || {
+            echo "::error::Input version '${{ inputs.version }}' != pyproject version '$PKG_VERSION'. Bump the version in pyproject.toml (and sprout/__init__.py) and commit first."
+            exit 1
+          }
+      - name: Version not already on PyPI
+        run: |
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/sprout-toolkit/${{ inputs.version }}/json")
+          echo "PyPI status for ${{ inputs.version }}: $STATUS"
+          test "$STATUS" = "404" || {
+            echo "::error::Version ${{ inputs.version }} already exists on PyPI. PyPI versions are immutable — bump to a new version instead."
+            exit 1
+          }
+
+  build-and-publish:
+    needs: check-version
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write # required for trusted publishing (OIDC)
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade build twine
+      - run: python -m build
+      - run: twine check dist/*
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
