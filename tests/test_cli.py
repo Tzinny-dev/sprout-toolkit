@@ -12,7 +12,7 @@ from typing import Callable
 from PIL import Image
 from typer.testing import CliRunner
 
-from sprout.cli import app, _lint_warnings
+from sprout.cli import app, _generate, _lint_warnings
 from sprout.generators.base import FrameData
 from sprout.spec import load_spec
 
@@ -38,7 +38,7 @@ def _wait(pred: Callable[[], bool], timeout: float, what: str) -> None:
 
 
 def test_commands_registered() -> None:
-    assert {"generate", "batch", "validate", "watch", "info", "lint"} <= _commands()
+    assert {"generate", "batch", "validate", "watch", "info", "lint", "diff"} <= _commands()
 
 
 def test_watch_regenerates_on_spec_change(tmp_path: Path) -> None:
@@ -215,3 +215,95 @@ def test_lint_font_spec_ignores_blank_space_glyph() -> None:
     assert result.exit_code == 0, result.output
     data = json.loads(result.stdout)
     assert not any(w["check"] == "empty_frames" for w in data["warnings"])
+
+
+# ── Comando `diff` ───────────────────────────────────────────────────────
+def _write_spec(path: Path, **overrides) -> None:
+    base = {
+        "name": "diff_atlas",
+        "seed": 1,
+        "files": {"atlas": "atlas.png"},
+        "layout": {"framePx": 32, "cols": 4, "tileLogical": 16},
+        "items": [
+            {"id": "rock", "generator": "props", "frames": 2, "params": {"kind": "rock"}},
+        ],
+    }
+    base.update(overrides)
+    path.write_text(json.dumps(base))
+
+
+def test_diff_specs_identical(tmp_path: Path) -> None:
+    a, b = tmp_path / "a.json", tmp_path / "b.json"
+    _write_spec(a)
+    _write_spec(b)
+    result = runner.invoke(app, ["diff", str(a), str(b)])
+    assert result.exit_code == 0, result.output
+    assert "sin diferencias" in result.stdout
+
+
+def test_diff_specs_detects_changes(tmp_path: Path) -> None:
+    a, b = tmp_path / "a.json", tmp_path / "b.json"
+    _write_spec(a, seed=1)
+    _write_spec(b, seed=2, layout={"framePx": 32, "cols": 8, "tileLogical": 16})
+    result = runner.invoke(app, ["diff", "--json", str(a), str(b)])
+    assert result.exit_code == 1, result.output
+    data = json.loads(result.stdout)
+    fields = {d["field"] for d in data["diffs"]}
+    assert "seed" in fields
+    assert "layout.cols" in fields
+
+
+def test_diff_specs_added_removed_items(tmp_path: Path) -> None:
+    a, b = tmp_path / "a.json", tmp_path / "b.json"
+    _write_spec(a)
+    _write_spec(b, items=[
+        {"id": "rock", "generator": "props", "frames": 2, "params": {"kind": "rock"}},
+        {"id": "bush", "generator": "props", "frames": 3, "params": {"kind": "bush"}},
+    ])
+    result = runner.invoke(app, ["diff", "--json", str(a), str(b)])
+    assert result.exit_code == 1, result.output
+    data = json.loads(result.stdout)
+    added = next(d for d in data["diffs"] if d["field"] == "items.bush")
+    assert added["a"] is None and added["b"] == "added"
+
+
+def test_diff_outputs_identical(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.json"
+    _write_spec(spec)
+    out_a, out_b = tmp_path / "a", tmp_path / "b"
+    _generate(spec, out_a, None, False)
+    _generate(spec, out_b, None, False)
+    result = runner.invoke(app, ["diff", str(out_a), str(out_b)])
+    assert result.exit_code == 0, result.output
+    assert "sin diferencias" in result.stdout
+
+
+def test_diff_outputs_detects_seed_change(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.json"
+    _write_spec(spec)
+    out_a, out_b = tmp_path / "a", tmp_path / "b"
+    _generate(spec, out_a, 1, False)
+    _generate(spec, out_b, 2, False)
+    result = runner.invoke(app, ["diff", "--json", str(out_a), str(out_b)])
+    assert result.exit_code == 1, result.output
+    data = json.loads(result.stdout)
+    fields = {d["field"] for d in data["diffs"]}
+    assert "atlas.crc" in fields
+
+
+def test_diff_mismatched_types_exits_1(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.json"
+    _write_spec(spec)
+    result = runner.invoke(app, ["diff", str(spec), str(tmp_path)])
+    assert result.exit_code == 1
+
+
+def test_diff_json_output_shape(tmp_path: Path) -> None:
+    a, b = tmp_path / "a.json", tmp_path / "b.json"
+    _write_spec(a)
+    _write_spec(b)
+    result = runner.invoke(app, ["diff", "--json", str(a), str(b)])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.stdout)
+    assert data["kind"] == "spec"
+    assert data["diffs"] == []

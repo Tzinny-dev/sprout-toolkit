@@ -6,6 +6,7 @@ Uso:
   sprout watch specs/ --out ../demo/assets/procgen
   sprout info specs/demo.json [--json]
   sprout lint specs/demo.json [--json]
+  sprout diff <a> <b> [--json]
   sprout validate specs/demo.json
 """
 from __future__ import annotations
@@ -281,6 +282,133 @@ def lint(
         for w in warnings:
             typer.echo(f"  - [{w['check']}] {w['message']}")
     raise typer.Exit(1 if warnings else 0)
+
+
+def _diff_specs(a: Spec, b: Spec) -> list[dict]:
+    """Diferencias estructurales entre dos specs: `[{"field", "a", "b"}, ...]`."""
+    diffs: list[dict] = []
+
+    for field in ("name", "seed", "target"):
+        av, bv = getattr(a, field), getattr(b, field)
+        if av != bv:
+            diffs.append({"field": field, "a": av, "b": bv})
+
+    for f in ("frame_px", "cols", "tile_logical", "sample"):
+        av, bv = getattr(a.layout, f), getattr(b.layout, f)
+        if av != bv:
+            diffs.append({"field": f"layout.{f}", "a": av, "b": bv})
+
+    a_items = {i.id: i for i in a.items}
+    b_items = {i.id: i for i in b.items}
+    for iid in sorted(set(b_items) - set(a_items)):
+        diffs.append({"field": f"items.{iid}", "a": None, "b": "added"})
+    for iid in sorted(set(a_items) - set(b_items)):
+        diffs.append({"field": f"items.{iid}", "a": "removed", "b": None})
+    for iid in sorted(set(a_items) & set(b_items)):
+        ia, ib = a_items[iid], b_items[iid]
+        if (ia.generator, ia.frames, ia.params) != (ib.generator, ib.frames, ib.params):
+            diffs.append({
+                "field": f"items.{iid}",
+                "a": {"generator": ia.generator, "frames": ia.frames, "params": ia.params},
+                "b": {"generator": ib.generator, "frames": ib.frames, "params": ib.params},
+            })
+
+    a_anim, b_anim = a.animations, b.animations
+    for name in sorted(set(b_anim) - set(a_anim)):
+        diffs.append({"field": f"animations.{name}", "a": None, "b": "added"})
+    for name in sorted(set(a_anim) - set(b_anim)):
+        diffs.append({"field": f"animations.{name}", "a": "removed", "b": None})
+    for name in sorted(set(a_anim) & set(b_anim)):
+        ia, ib = a_anim[name], b_anim[name]
+        if (ia.frames, ia.fps, ia.loop) != (ib.frames, ib.fps, ib.loop):
+            diffs.append({
+                "field": f"animations.{name}",
+                "a": {"frames": ia.frames, "fps": ia.fps, "loop": ia.loop},
+                "b": {"frames": ib.frames, "fps": ib.fps, "loop": ib.loop},
+            })
+
+    return diffs
+
+
+def _diff_outputs(a: Path, b: Path) -> list[dict]:
+    """Diferencias entre dos directorios de salida: CRC del atlas + manifest.json."""
+    diffs: list[dict] = []
+
+    atlas_a, atlas_b = a / "atlas.png", b / "atlas.png"
+    if atlas_a.is_file() and atlas_b.is_file():
+        crc_a = zlib.crc32(atlas_a.read_bytes()) & 0xFFFFFFFF
+        crc_b = zlib.crc32(atlas_b.read_bytes()) & 0xFFFFFFFF
+        if crc_a != crc_b:
+            diffs.append({"field": "atlas.crc", "a": f"{crc_a:08x}", "b": f"{crc_b:08x}"})
+    else:
+        diffs.append({"field": "atlas.png", "a": atlas_a.is_file(), "b": atlas_b.is_file()})
+
+    man_a_p, man_b_p = a / "manifest.json", b / "manifest.json"
+    if not (man_a_p.is_file() and man_b_p.is_file()):
+        diffs.append({"field": "manifest.json", "a": man_a_p.is_file(), "b": man_b_p.is_file()})
+        return diffs
+
+    man_a = json.loads(man_a_p.read_text())
+    man_b = json.loads(man_b_p.read_text())
+
+    for field in ("name", "seed"):
+        if man_a.get(field) != man_b.get(field):
+            diffs.append({"field": field, "a": man_a.get(field), "b": man_b.get(field)})
+
+    size_a = (man_a["files"]["atlasW"], man_a["files"]["atlasH"])
+    size_b = (man_b["files"]["atlasW"], man_b["files"]["atlasH"])
+    if size_a != size_b:
+        diffs.append({"field": "atlas.size", "a": list(size_a), "b": list(size_b)})
+
+    ids_a = {f["id"] for f in man_a["frames"]}
+    ids_b = {f["id"] for f in man_b["frames"]}
+    if ids_b - ids_a:
+        diffs.append({"field": "frames.added", "a": None, "b": sorted(ids_b - ids_a)})
+    if ids_a - ids_b:
+        diffs.append({"field": "frames.removed", "a": sorted(ids_a - ids_b), "b": None})
+
+    for block in ("autotile", "shader", "font"):
+        if (block in man_a) != (block in man_b):
+            diffs.append({"field": f"{block}.present", "a": block in man_a, "b": block in man_b})
+
+    return diffs
+
+
+@app.command()
+def diff(
+    a: Path = typer.Argument(..., help="spec.json o directorio de salida A"),
+    b: Path = typer.Argument(..., help="spec.json o directorio de salida B"),
+    as_json: bool = typer.Option(False, "--json", help="salida machine-readable"),
+) -> None:
+    """Compara dos specs (.json) o dos directorios de salida (atlas+manifest)."""
+    a_is_spec, b_is_spec = a.suffix == ".json", b.suffix == ".json"
+    if a_is_spec != b_is_spec:
+        typer.secho("no se puede comparar una spec (.json) con un directorio de salida",
+                    fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+    try:
+        if a_is_spec:
+            kind, diffs = "spec", _diff_specs(load_spec(a), load_spec(b))
+        else:
+            if not a.is_dir() or not b.is_dir():
+                typer.secho(f"directorio no encontrado: {a if not a.is_dir() else b}",
+                            fg=typer.colors.RED, err=True)
+                raise typer.Exit(1)
+            kind, diffs = "output", _diff_outputs(a, b)
+    except SpecError as e:
+        typer.secho(f"inválida: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+    if as_json:
+        typer.echo(json.dumps({"a": str(a), "b": str(b), "kind": kind, "diffs": diffs}, indent=2))
+    elif not diffs:
+        typer.secho(f"sin diferencias ({kind})", fg=typer.colors.GREEN)
+    else:
+        typer.secho(f"{len(diffs)} diferencia(s) ({kind}):", fg=typer.colors.YELLOW)
+        for d in diffs:
+            typer.echo(f"  - {d['field']}: {d['a']!r} -> {d['b']!r}")
+    raise typer.Exit(1 if diffs else 0)
 
 
 @app.command()
