@@ -1,8 +1,8 @@
-"""Exporters: construyen el spritesheet, el `manifest.json` (v0) y el módulo
-TypeScript `index.ts` para Expo + react-native-skia.
+"""Exporters: build the spritesheet, the `manifest.json` (v0) and the
+TypeScript `index.ts` module for Expo + react-native-skia.
 
-El `index.ts` generado es la pieza "cableada": requiere estáticos (obligatorios
-para Metro/EAS Update), tipos del manifest y helpers de frames.
+The generated `index.ts` is the "wired" piece: it requires static assets
+(mandatory for Metro/EAS Update), manifest types and frame helpers.
 """
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ def shader_filename(spec: Spec) -> str:
 
 
 def build_shader(spec: Spec) -> tuple[str, dict] | tuple[None, None]:
-    """Fuente SkSL + bloque `shader` del manifest (o `(None, None)` si `runtime` off)."""
+    """SkSL source + manifest `shader` block (or `(None, None)` if `runtime` is off)."""
     if spec.runtime is None:
         return None, None
     source = sksl.render_shader()
@@ -38,7 +38,7 @@ def _frame_ids(item_id: str, count: int) -> list[str]:
 
 
 def render_items(spec: Spec) -> list[list[FrameData]]:
-    """Genera los frames de todos los items, en orden de la spec."""
+    """Generates frames for all items, in spec order."""
     out: list[list[FrameData]] = []
     offset = 0
     for item in spec.items:
@@ -53,7 +53,7 @@ def render_items(spec: Spec) -> list[list[FrameData]]:
 
 
 def build_sheet(spec: Spec, items_frames: list[list[FrameData]]) -> tuple[Image.Image, list[dict]]:
-    """Empaqueta frames en grilla row-major -> (sheet RGBA, records con coords)."""
+    """Packs frames into a row-major grid -> (RGBA sheet, records with coords)."""
     cols = spec.layout.cols
     frame = spec.layout.frame_px
     rows = spec.layout.resolve_rows(spec.total_frames)
@@ -77,7 +77,7 @@ def build_sheet(spec: Spec, items_frames: list[list[FrameData]]) -> tuple[Image.
 
 
 def build_autotile_map(spec: Spec, items_frames: list[list[FrameData]]) -> dict:
-    """Bloque `autotile` del manifest: item -> {size, mask: {máscara: frameId}}."""
+    """Manifest `autotile` block: item -> {size, mask: {mask: frameId}}."""
     items: dict[str, dict] = {}
     for item, frames in zip(spec.items, items_frames, strict=True):
         if item.autotile is None:
@@ -90,7 +90,7 @@ def build_autotile_map(spec: Spec, items_frames: list[list[FrameData]]) -> dict:
 
 
 def build_font_map(spec: Spec, items_frames: list[list[FrameData]]) -> dict:
-    """Bloque `font` del manifest: item -> {ascent, descent, glyphs}."""
+    """Manifest `font` block: item -> {ascent, descent, glyphs}."""
     items: dict[str, dict] = {}
     for item, frames in zip(spec.items, items_frames, strict=True):
         if item.generator != "font":
@@ -156,18 +156,18 @@ def build_manifest(spec: Spec, records: list[dict], atlas_name: str,
 
 
 def apply_png_mode(img: Image.Image, png_mode: str) -> Image.Image:
-    """Convierte el atlas al modo de export elegido antes de guardar.
+    """Converts the atlas to the chosen export mode before saving.
 
-    "png24" descarta el canal alpha (solo apto para atlases sin
-    transparencia real, p. ej. `terrain`). "png8" cuantiza a paleta indexada
-    de 256 colores — PIL conserva el alpha exacto por entrada de paleta, así
-    que la transparencia sobrevive (verificado con píxeles opacos,
-    semitransparentes y vacíos)."""
+    "png24" drops the alpha channel (only suitable for atlases without real
+    transparency, e.g. `terrain`). "png8" quantizes to a 256-color indexed
+    palette — PIL preserves the exact alpha per palette entry, so
+    transparency survives (verified with opaque, semi-transparent and empty
+    pixels)."""
     if png_mode == "png24":
         return img.convert("RGB")
     if png_mode == "png8":
         return img.quantize(colors=256)
-    return img  # "rgba" (default): sin cambios
+    return img  # "rgba" (default): no change
 
 
 def write_png(sheet: Image.Image, path: Path, png_mode: str = "rgba") -> int:
@@ -185,8 +185,8 @@ def texturepacker_filename(spec: Spec) -> str:
 
 def build_texturepacker(spec: Spec, records: list[dict], atlas_name: str,
                         sheet: Image.Image, png_mode: str) -> dict:
-    """Formato "JSON (Hash)" de TexturePacker — compatible con Phaser/PixiJS/
-    etc. No reemplaza `manifest.json`, se emite junto a él (opt-in)."""
+    """TexturePacker "JSON (Hash)" format — compatible with Phaser/PixiJS/
+    etc. Does not replace `manifest.json`, it's emitted alongside it (opt-in)."""
     frames = {
         f"{r['id']}.png": {
             "frame": {"x": r["x"], "y": r["y"], "w": r["w"], "h": r["h"]},
@@ -216,9 +216,9 @@ def write_texturepacker(tp: dict, path: Path) -> None:
 
 
 def compute_mipmap_meta(sheet: Image.Image, spec: Spec, levels: int) -> list[dict]:
-    """Metadata pura de los niveles de mip (scale/file/w/h), sin tocar disco:
-    se necesita antes del check de `skip_existing` y para el bloque
-    `mipmaps` del manifest. Se detiene si una dimensión bajaría de 4px."""
+    """Pure metadata for the mip levels (scale/file/w/h), without touching disk:
+    needed before the `skip_existing` check and for the manifest's `mipmaps`
+    block. Stops if a dimension would drop below 4px."""
     base = Path(spec.filename)
     out: list[dict] = []
     scale = 1.0
@@ -237,8 +237,8 @@ def compute_mipmap_meta(sheet: Image.Image, spec: Spec, levels: int) -> list[dic
 
 def write_mipmap_files(sheet: Image.Image, out_dir: Path, png_mode: str,
                        meta: list[dict]) -> None:
-    """Escribe cada nivel de mip: `Image.BOX` (filtro de promedio de área,
-    correcto para mip generation — evita el ringing de Lanczos)."""
+    """Writes each mip level: `Image.BOX` (area-average filter, correct for
+    mip generation — avoids Lanczos ringing)."""
     out_dir.mkdir(parents=True, exist_ok=True)
     for lvl in meta:
         img = sheet.resize((lvl["w"], lvl["h"]), Image.BOX)
@@ -275,7 +275,7 @@ export const SHADER_DEFAULTS = {uniforms_json} as const;
 
 export function shaderUniforms(time = 0): Record<string, number | number[]> {{
   const u = manifest.shader?.uniforms;
-  if (!u) throw new Error('manifest sin bloque shader (spec.runtime)');
+  if (!u) throw new Error('manifest has no shader block (spec.runtime)');
   return {{
     u_freq: u.freq,
     u_oct: u.octaves,
@@ -410,13 +410,13 @@ const byId = new Map(manifest.frames.map((f) => [f.id, f]));
 
 export function frameById(id: string): Frame {{
   const frame = byId.get(id);
-  if (!frame) throw new Error(`Frame desconocido: ${{id}}`);
+  if (!frame) throw new Error(`Unknown frame: ${{id}}`);
   return frame;
 }}
 
 export function framesFor(animId: string): Frame[] {{
   const anim = manifest.anim[animId];
-  if (!anim) throw new Error(`Animación desconocida: ${{animId}}`);
+  if (!anim) throw new Error(`Unknown animation: ${{animId}}`);
   return anim.frames.map(frameById);
 }}
 
@@ -427,9 +427,9 @@ export const atlasSampling = {{ filter: sampleMode }};
 
 export function rectFor(frameId: string): {{ x: number; y: number; w: number; h: number }} {{
   const f = frameById(frameId);
-  // Inset de medio texel: evita sangrado del frame vecino del atlas cuando el
-  // muestreo nearest cae fuera del rect (clamp-to-edge) por redondeo del
-  // escalado destino (p. ej. 64px de frame a 84px de dispositivo con DPR 2.625).
+  // Half-texel inset: avoids bleeding from the atlas' neighboring frame when
+  // nearest sampling falls outside the rect (clamp-to-edge) due to rounding
+  // in the destination scale (e.g. a 64px frame to an 84px device pixel with DPR 2.625).
   const e = 0.5;
   return {{ x: f.x + e, y: f.y + e, w: f.w - 2 * e, h: f.h - 2 * e }};
 }}
@@ -449,8 +449,8 @@ export function useAtlasSprites(specs: readonly SpriteSpec[], scale = frameScale
   const image = useAtlasImage();
   const rects = specs.map((s) => rectFor(s.id));
   const frames = specs.map((s) => frameById(s.id));
-  // Compensa el inset de rectFor: ajusta la escala para que el tamaño destino
-  // (scale * framePx) no cambie pese a que el source recortado es 2e px menor.
+  // Compensates for rectFor's inset: adjusts the scale so the destination size
+  // (scale * framePx) doesn't change even though the trimmed source is 2e px smaller.
   const scales = specs.map(
     (s, i) => (s.scale ?? scale) * (frames[i].w / rects[i].w),
   );
@@ -482,13 +482,13 @@ export function useAtlasGrid(
   return useAtlasSprites(specs);
 }}
 
-// --- Modo batch imperativo (post-MVP, §11) ---
-// Graba N sprites en un SkPicture con un único canvas.drawAtlas: un draw call
-// por textura sin el cruce JSI por transform del path declarativo (<Atlas> +
-// buffers reanimados) que penaliza en Android de gama baja (#2521/#2688).
-// Los pools se mutan in-place: la grabación no aloca en estado estable.
+// --- Imperative batch mode (post-MVP, §11) ---
+// Records N sprites into a SkPicture with a single canvas.drawAtlas: one draw
+// call per texture, without the per-transform JSI crossing of the declarative
+// path (<Atlas> + reanimated buffers) that hurts low-end Android (#2521/#2688).
+// The pools are mutated in-place: recording doesn't allocate in steady state.
 
-/** Specs tipadas de solo lectura (tuplas planas, listas para grabar). */
+/** Typed read-only specs (flat tuples, ready to record). */
 export type SpriteSpecData = readonly (readonly [
   id: string,
   x: number,
@@ -496,7 +496,7 @@ export type SpriteSpecData = readonly (readonly [
   scale: number,
 ])[];
 
-/** Convierte SpriteSpec[] a tuplas planas. */
+/** Converts SpriteSpec[] to flat tuples. */
 export function toSpecData(
   specs: readonly SpriteSpec[],
   scale = frameScale,
@@ -504,7 +504,7 @@ export function toSpecData(
   return specs.map((s) => [s.id, s.x, s.y, s.scale ?? scale]);
 }}
 
-/** Infla specs planas a pools mutables de rects/xforms listos para grabar. */
+/** Inflates flat specs into mutable rects/xforms pools ready to record. */
 export function inflateSpecData(data: SpriteSpecData): {{
   rects: SkHostRect[];
   xforms: SkRSXform[];
@@ -514,8 +514,8 @@ export function inflateSpecData(data: SpriteSpecData): {{
   for (let i = 0; i < data.length; i++) {{
     const [id, x, y, scale] = data[i];
     const f = frameById(id);
-    // Mismo inset de medio texel y compensación de escala que rectFor:
-    // el destino sigue siendo scale * framePx pese al source recortado.
+    // Same half-texel inset and scale compensation as rectFor:
+    // the destination stays scale * framePx despite the trimmed source.
     const e = 0.5;
     rects[i] = Skia.XYWHRect(f.x + e, f.y + e, f.w - 2 * e, f.h - 2 * e);
     xforms[i] = Skia.RSXform(scale * (f.w / (f.w - 2 * e)), 0, x, y);
@@ -524,9 +524,9 @@ export function inflateSpecData(data: SpriteSpecData): {{
 }}
 
 /**
- * Graba specs estáticas en un SkPicture con un único drawAtlas.
- * `dpr` opcional: si se pasa, alinea cada sprite a píxel de dispositivo
- * (recomendado con DPR no entero y muestreo nearest, ver IslandMap).
+ * Records static specs into a SkPicture with a single drawAtlas.
+ * Optional `dpr`: if passed, aligns each sprite to a device pixel
+ * (recommended with non-integer DPR and nearest sampling, see IslandMap).
  */
 export function makeStaticAtlasPicture(
   data: SpriteSpecData,
@@ -582,9 +582,9 @@ export function makeStaticAtlasPicture(
 }}
 
 /**
- * Buffers preasignados + paint imperativo compartido para batches animados.
- * `count` fija la capacidad (reserva por una vez, sin realloc por frame);
- * `specs.length` sprites activos se escriben con `inflateInto` cada frame.
+ * Preallocated buffers + shared imperative paint for animated batches.
+ * `count` sets the capacity (reserved once, no realloc per frame);
+ * `specs.length` active sprites are written with `inflateInto` each frame.
  */
 export function useAtlasBatch(
   specs: readonly SpriteSpec[],
@@ -610,7 +610,7 @@ export function useAtlasBatch(
     rects,
     xforms,
     paint,
-    /** Vuelca las primeras specs.length posiciones de los buffers. */
+    /** Flushes the first specs.length positions of the buffers. */
     inflateInto: () => {{
       const arr = rects.value as SkHostRect[];
       const xf = xforms.value as SkRSXform[];
@@ -644,26 +644,26 @@ export function canonicalMask(mask: number, size: 16 | 47): number {{
 
 export function autotileFrame(mask: number, item = 'tiles'): Frame {{
   const auto = manifest.autotile;
-  if (!auto) throw new Error('manifest sin bloque autotile');
+  if (!auto) throw new Error('manifest has no autotile block');
   const entry = auto.items[item];
-  if (!entry) throw new Error(`autotile desconocido: ${{item}}`);
+  if (!entry) throw new Error(`Unknown autotile: ${{item}}`);
   const m = canonicalMask(mask, entry.size);
   const id = entry.mask[String(m)];
-  if (!id) throw new Error(`autotile sin frame para máscara ${{m}} en ${{item}}`);
+  if (!id) throw new Error(`autotile has no frame for mask ${{m}} in ${{item}}`);
   return frameById(id);
 }}
 
 export function glyphFrame(char: string, item = 'font'): Frame {{
   const fontBlock = manifest.font;
-  if (!fontBlock) throw new Error('manifest sin bloque font');
+  if (!fontBlock) throw new Error('manifest has no font block');
   const entry = fontBlock.items[item];
-  if (!entry) throw new Error(`font desconocido: ${{item}}`);
+  if (!entry) throw new Error(`Unknown font: ${{item}}`);
   const glyph = entry.glyphs[char];
-  if (!glyph) throw new Error(`glifo sin frame para caracter '${{char}}' en ${{item}}`);
+  if (!glyph) throw new Error(`glyph has no frame for character '${{char}}' in ${{item}}`);
   return frameById(glyph.id);
 }}
 
-/** Arma SpriteSpec[] para un texto, avanzando en x según el ancho de cada glifo. */
+/** Builds SpriteSpec[] for a text, advancing in x by each glyph's width. */
 export function textSprites(
   text: string,
   origin: {{ x: number; y: number }},
@@ -671,9 +671,9 @@ export function textSprites(
   scale = frameScale,
 ): SpriteSpec[] {{
   const fontBlock = manifest.font;
-  if (!fontBlock) throw new Error('manifest sin bloque font');
+  if (!fontBlock) throw new Error('manifest has no font block');
   const entry = fontBlock.items[item];
-  if (!entry) throw new Error(`font desconocido: ${{item}}`);
+  if (!entry) throw new Error(`Unknown font: ${{item}}`);
   const specs: SpriteSpec[] = [];
   let x = origin.x;
   for (const ch of text) {{

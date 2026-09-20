@@ -1,26 +1,26 @@
-"""Generador ``font``: bitmap font desde un TTF/OTF real (vía PIL/FreeType),
-un glifo por frame.
+"""``font`` generator: bitmap font from a real TTF/OTF (via PIL/FreeType),
+one glyph per frame.
 
-A diferencia del resto de generadores (100% procedurales), ``font`` depende
-de un archivo de fuente en disco. Por defecto usa la fuente empaquetada en
-``sprout/assets/fonts/DejaVuSansMono-Bold.ttf`` (licencia Bitstream Vera, ver
-``.LICENSE.txt`` junto al archivo) — vive **dentro** del paquete `sprout`
-(no en `cli/assets/`) para que un `pip install` real (no editable) la
-incluya vía `[tool.setuptools.package-data]`; ``font_path`` permite apuntar
-a otra fuente.
+Unlike the rest of the generators (100% procedural), ``font`` depends on a
+font file on disk. By default it uses the font bundled at
+``sprout/assets/fonts/DejaVuSansMono-Bold.ttf`` (Bitstream Vera license, see
+``.LICENSE.txt`` next to the file) — it lives **inside** the `sprout`
+package (not in `cli/assets/`) so that a real `pip install` (non-editable)
+includes it via `[tool.setuptools.package-data]`; ``font_path`` lets you
+point to a different font.
 
-Parámetros de spec (item.params):
-    chars     : caracteres a generar, uno por frame (default ASCII imprimible
-                32-126, 95 caracteres). ``frames`` debe ser igual a
+Spec parameters (item.params):
+    chars     : characters to generate, one per frame (default: printable
+                ASCII 32-126, 95 characters). ``frames`` must equal
                 ``len(chars)``.
-    font_path : ruta a un .ttf/.otf (default: fuente empaquetada).
-    size      : tamaño de fuente en puntos/px (default 0.6 * frame_px).
-    fill      : [r, g, b]  color del glifo (default blanco — pensado para
-                tintarse en runtime).
+    font_path : path to a .ttf/.otf (default: bundled font).
+    size      : font size in points/px (default 0.6 * frame_px).
+    fill      : [r, g, b]  glyph color (default white — meant to be
+                tinted at runtime).
 
-El render no depende del ``seed``: es una rasterización determinista de la
-fuente, igual que ``panel`` en ``ui.py``. El espacio (0x20) es un frame
-legítimamente vacío (sin tinta) — no es un bug.
+Rendering does not depend on ``seed``: it's a deterministic rasterization of
+the font, just like ``panel`` in ``ui.py``. The space character (0x20) is a
+legitimately empty frame (no ink) — not a bug.
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 from .base import FrameData, Generator
 
-DEFAULT_CHARS = "".join(chr(c) for c in range(32, 127))  # ASCII imprimible
+DEFAULT_CHARS = "".join(chr(c) for c in range(32, 127))  # printable ASCII
 
 BUNDLED_FONT = (
     Path(__file__).resolve().parents[1] / "assets" / "fonts" / "DejaVuSansMono-Bold.ttf"
@@ -42,7 +42,7 @@ def resolve_font_path(params: dict) -> str:
 
 
 class Font(Generator):
-    """Atlas de glifos: un frame por carácter, con métricas de avance."""
+    """Glyph atlas: one frame per character, with advance metrics."""
 
     id = "font"
 
@@ -57,8 +57,8 @@ class Font(Generator):
         chars = params.get("chars", DEFAULT_CHARS)
         if count != len(chars):
             raise ValueError(
-                f"font: frames debe ser {len(chars)} (uno por carácter en "
-                f"'chars'), recibido {count}"
+                f"font: frames must be {len(chars)} (one per character in "
+                f"'chars'), got {count}"
             )
 
         font_path = resolve_font_path(params)
@@ -67,7 +67,7 @@ class Font(Generator):
         try:
             face = ImageFont.truetype(font_path, size)
         except OSError as e:
-            raise ValueError(f"font.font_path no se pudo cargar: {font_path} ({e})") from e
+            raise ValueError(f"font.font_path could not be loaded: {font_path} ({e})") from e
 
         pad = max(2, int(frame_px * 0.06))
         out: list[FrameData] = []

@@ -1,3 +1,3 @@
-"""sprout — toolchain determinista de assets 2D procedurales para Expo + react-native-skia."""
+"""sprout — deterministic toolchain for procedural 2D assets for Expo + react-native-skia."""
 
-__version__ = "0.1.0"
+__version__ = "0.1.1"

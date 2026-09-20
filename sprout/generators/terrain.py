@@ -1,15 +1,15 @@
-"""Generador `terrain`: tiles de ruido seamless deterministas.
+"""`terrain` generator: deterministic seamless noise tiles.
 
-Value-noise FBM con lattice toroidal (periodo = frame_px), mapeado sobre una
-paleta. Cada tile usa un seed derivado (``seed`` mezclado con su índice) para
-variar el patrón sin romper el determinismo.
+Value-noise FBM on a toroidal lattice (period = frame_px), mapped onto a
+palette. Each tile uses a derived seed (``seed`` mixed with its index) to
+vary the pattern without breaking determinism.
 
-Modo autotile (``params.autotile == 16 | 47``): en vez de un tile de relleno,
-produce la hoja completa de variantes de silueta. La forma se compone por
-cuadrantes (2x2) según la máscara canónica: un lado sin vecino se retrae
-``bevel``, y una esquina cóncava (ambos lados presentes, diagonal ausente) se
-muerde. Todas las variantes comparten el mismo campo de ruido para que casen
-sin costuras al pintar el mapa.
+Autotile mode (``params.autotile == 16 | 47``): instead of a single fill
+tile, produces the full sheet of silhouette variants. The shape is composed
+by quadrants (2x2) according to the canonical mask: a side with no neighbor
+is inset by ``bevel``, and a concave corner (both sides present, diagonal
+absent) gets bitten. All variants share the same noise field so they tile
+seamlessly when painting the map.
 """
 from __future__ import annotations
 
@@ -73,10 +73,10 @@ def _blend(base: tuple[int, int, int], noise: float) -> tuple[int, int, int]:
 
 
 def _tile_land(mask: int, size: int, u: float, v: float, bevel: float) -> bool:
-    """¿El punto (u,v) ∈ [0,1)² del tile es tierra para ``mask``?"""
+    """Is the point (u,v) ∈ [0,1)² of the tile land, for ``mask``?"""
     if size == 16:
-        # Match Sides: rectángulo retraído ``bevel`` de cada lado sin vecino;
-        # la diagonal se ignora (esquinas interiores rectas).
+        # Match Sides: rectangle inset by ``bevel`` on each side with no
+        # neighbor; the diagonal is ignored (straight interior corners).
         return (
             (u >= bevel or bool(mask & autotile.W))
             and (u <= 1.0 - bevel or bool(mask & autotile.E))
@@ -153,7 +153,7 @@ class Terrain(Generator):
         variant = autotile.masks(size)
         if count != len(variant):
             raise ValueError(
-                f"autotile {size} requiere {len(variant)} frames, la spec pide {count}"
+                f"autotile {size} requires {len(variant)} frames, spec asked for {count}"
             )
 
         n = seamless_noise(frame_px, frame_px, cells, octaves, seed % 2**31)

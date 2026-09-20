@@ -1,4 +1,4 @@
-"""Tests del generador `particles` (bursts animados)."""
+"""Tests for the `particles` generator (animated bursts)."""
 from __future__ import annotations
 
 import json
@@ -21,7 +21,7 @@ def _crc(p: Path) -> int:
 
 
 def _alpha_px(img) -> int:
-    """Píxeles con alpha > 0 (sin numpy: histograma del canal A)."""
+    """Pixels with alpha > 0 (no numpy: histogram of the A channel)."""
     return sum(img.getchannel("A").histogram()[1:])
 
 
@@ -29,16 +29,16 @@ def _alpha_px(img) -> int:
 def test_ease_out_cubic_endpoints_and_monotonic() -> None:
     assert ease_out_cubic(0.0) == 0.0
     assert ease_out_cubic(1.0) == 1.0
-    # satura fuera de rango
+    # saturates out of range
     assert ease_out_cubic(-5.0) == 0.0
     assert ease_out_cubic(9.0) == 1.0
     vals = [ease_out_cubic(i / 20) for i in range(21)]
-    assert vals == sorted(vals), "debe ser monótona creciente"
-    # desacelera: el primer tramo avanza más que el último
+    assert vals == sorted(vals), "must be monotonically increasing"
+    # decelerates: the first stretch advances more than the last
     assert vals[5] - vals[0] > vals[20] - vals[15]
 
 
-# ── Contrato del plug-in ────────────────────────────────────────────────
+# ── Plug-in contract ─────────────────────────────────────────────────────
 def test_registered() -> None:
     assert Particles.id == "particles"
     assert GENERATORS["particles"] is Particles
@@ -51,12 +51,12 @@ def test_all_kinds_animate_without_empty_frames() -> None:
                               params={"kind": kind, "particles": 12})
         assert len(frames) == 8
         cov = [_alpha_px(f.image) for f in frames]
-        assert all(c > 0 for c in cov), f"kind '{kind}' tiene frames vacíos: {cov}"
-        assert max(cov) > 100, f"kind '{kind}' renderiza muy poco: {cov}"
+        assert all(c > 0 for c in cov), f"kind '{kind}' has empty frames: {cov}"
+        assert max(cov) > 100, f"kind '{kind}' renders too little: {cov}"
 
 
 def test_burst_expands_over_frames() -> None:
-    """El bbox del burst debe crecer entre el frame inicial y el pico."""
+    """The burst's bbox must grow between the initial frame and the peak."""
     frames = Particles().generate(7, 8, 64, {"kind": "spark", "particles": 14})
 
     def bbox_w(img) -> float:
@@ -72,22 +72,22 @@ def test_invalid_kind_raises() -> None:
 
 
 def test_minimum_frames_saturated_to_two() -> None:
-    """Se satura a >=2 frames."""
+    """Saturates to >=2 frames."""
     assert len(Particles().generate(1, 1, 64, {"kind": "spark"})) == 2
 
 
 def test_particle_count_floor_is_two() -> None:
-    """`particles: 0` -> mínimo 2; el arranque del burst siempre tiene contenido.
+    """`particles: 0` -> minimum 2; the start of the burst always has content.
 
-    Nota: con pocas partículas los frames finales pueden quedar vacíos (el
-    burst se extingue) — es comportamiento deseado para un efecto one-shot.
+    Note: with few particles the final frames may end up empty (the
+    burst dies out) — this is expected behavior for a one-shot effect.
     """
     frames = Particles().generate(1, 4, 64, {"kind": "spark", "particles": 0})
     assert len(frames) == 4
     assert _alpha_px(frames[0].image) > 0
 
 
-# ── Determinismo ────────────────────────────────────────────────────────
+# ── Determinism ───────────────────────────────────────────────────────────
 def test_same_seed_is_byte_identical() -> None:
     a = Particles().generate(42, 6, 64, {"kind": "smoke"})
     b = Particles().generate(42, 6, 64, {"kind": "smoke"})
@@ -106,7 +106,7 @@ def test_base_offset_changes_burst() -> None:
     assert a[0].image.tobytes() != b[0].image.tobytes()
 
 
-# ── Parámetros ──────────────────────────────────────────────────────────
+# ── Parameters ────────────────────────────────────────────────────────────
 def test_particle_count_scales_coverage() -> None:
     few = Particles().generate(3, 4, 64, {"kind": "spark", "particles": 4})
     many = Particles().generate(3, 4, 64, {"kind": "spark", "particles": 40})
@@ -128,7 +128,7 @@ def test_size_scales_with_frame_px() -> None:
         assert all(f.image.size == (size, size) for f in frames)
 
 
-# ── Pipeline completo (spec -> atlas + manifest + index.ts) ─────────────
+# ── Full pipeline (spec -> atlas + manifest + index.ts) ──────────────────
 def test_spec_generates_all_outputs(tmp_path: Path) -> None:
     out = tmp_path / "out"
     _generate(SPEC, out, None, False)
@@ -153,7 +153,7 @@ def test_manifest_frames_and_animation(tmp_path: Path) -> None:
     assert len(m["frames"]) == 32
     ids = {f["id"] for f in m["frames"]}
     assert "spark_00" in ids and "bubble_07" in ids
-    # animación one-shot declarada en la spec
+    # one-shot animation declared in the spec
     assert m["anim"]["burst_spark"]["fps"] == 16
     assert m["anim"]["burst_spark"]["loop"] is False
     assert m["anim"]["burst_spark"]["frames"] == [f"spark_{i:02d}" for i in range(8)]

@@ -1,4 +1,4 @@
-"""Tests del generador `props` (objetos estáticos)."""
+"""Tests for the `props` generator (static objects)."""
 from __future__ import annotations
 
 import json
@@ -25,7 +25,7 @@ def _opaque(img) -> int:
     return int((img.getchannel("A").getbbox() is not None))
 
 
-# ── Contrato del plug-in ────────────────────────────────────────────────
+# ── Plug-in contract ───────────────────────────────────────────────────
 def test_registered() -> None:
     assert Props.id == "props"
     assert GENERATORS["props"] is Props
@@ -39,7 +39,7 @@ def test_all_kinds_render_nonempty() -> None:
         for fr in frames:
             assert fr.image.size == (64, 64)
             assert fr.image.mode == "RGBA"
-            assert _opaque(fr.image), f"kind '{kind}' renderizó vacío"
+            assert _opaque(fr.image), f"kind '{kind}' rendered empty"
 
 
 def test_default_kind_is_rock() -> None:
@@ -52,7 +52,7 @@ def test_invalid_kind_raises() -> None:
         Props().generate(1, 1, 64, {"kind": "dragon"})
 
 
-# ── Determinismo ────────────────────────────────────────────────────────
+# ── Determinism ─────────────────────────────────────────────────────────
 def test_same_seed_is_byte_identical() -> None:
     a = Props().generate(42, 3, 64, {"kind": "rock"})
     b = Props().generate(42, 3, 64, {"kind": "rock"})
@@ -66,19 +66,19 @@ def test_seed_changes_output() -> None:
 
 
 def test_variants_differ_between_slots() -> None:
-    """Cada slot de la grilla debe ser una variante distinta."""
+    """Each grid slot must be a distinct variant."""
     frames = Props().generate(7, 4, 64, {"kind": "bush"})
     assert len({f.image.tobytes() for f in frames}) == 4
 
 
 def test_base_offset_changes_variant() -> None:
-    """El offset ``base`` (posición global en el sheet) varía la semilla."""
+    """The ``base`` offset (global position in the sheet) varies the seed."""
     a = Props().generate(5, 1, 64, {"kind": "flower"}, base=0)
     b = Props().generate(5, 1, 64, {"kind": "flower"}, base=100)
     assert a[0].image.tobytes() != b[0].image.tobytes()
 
 
-# ── Paleta ───────────────────────────────────────────────────────────────
+# ── Palette ────────────────────────────────────────────────────────────
 def test_color_override_applied() -> None:
     frames = Props().generate(
         1, 1, 64, {"kind": "chest", "fill": [10, 20, 30], "outline": [1, 2, 3]}
@@ -110,8 +110,8 @@ def test_anchor_deterministic() -> None:
 
 
 def test_anchor_follows_actual_shape() -> None:
-    """El anchor sigue el bbox alpha real, no una constante por kind: el
-    tallo de `mushroom` cae más abajo que el cuerpo compacto de `rock`."""
+    """The anchor follows the actual alpha bbox, not a per-kind constant: the
+    `mushroom` stem falls further down than the compact `rock` body."""
     rock = Props().generate(1, 1, 64, {"kind": "rock"})[0].meta["anchor"]
     mushroom = Props().generate(1, 1, 64, {"kind": "mushroom"})[0].meta["anchor"]
     assert mushroom["y"] > rock["y"]
@@ -124,7 +124,7 @@ def test_anchor_falls_back_to_center_on_empty_frame() -> None:
     assert _anchor_from_alpha(empty) == {"x": 32.0, "y": 32.0}
 
 
-# ── Pipeline completo (spec -> atlas + manifest + index.ts) ─────────────
+# ── Full pipeline (spec -> atlas + manifest + index.ts) ─────────────────
 def test_spec_generates_all_outputs(tmp_path: Path) -> None:
     out = tmp_path / "out"
     _generate(SPEC, out, None, False)
@@ -146,7 +146,7 @@ def test_manifest_frames_have_anchor(tmp_path: Path) -> None:
     _generate(SPEC, out, None, False)
     m = json.loads((out / "manifest.json").read_text())
     for f in m["frames"]:
-        assert "anchor" in f, f"frame '{f['id']}' sin anchor"
+        assert "anchor" in f, f"frame '{f['id']}' missing anchor"
         assert isinstance(f["anchor"]["x"], (int, float))
         assert isinstance(f["anchor"]["y"], (int, float))
 

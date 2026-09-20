@@ -1,4 +1,4 @@
-"""Tests de validación de spec."""
+"""Spec validation tests."""
 from __future__ import annotations
 
 import json
@@ -29,8 +29,8 @@ def test_load_valid(tmp_path) -> None:
 
 def test_unknown_generator_rejected(tmp_path) -> None:
     spec = {"name": "x", "seed": 1, "layout": {"cols": 4},
-            "items": [{"id": "a", "generator": "magia", "frames": 1}]}
-    with pytest.raises(SpecError, match="magia"):
+            "items": [{"id": "a", "generator": "magic", "frames": 1}]}
+    with pytest.raises(SpecError, match="magic"):
         load_spec(_write(tmp_path, spec))
 
 
@@ -39,7 +39,7 @@ def test_duplicate_item_ids_rejected(tmp_path) -> None:
         {"id": "a", "generator": "terrain", "frames": 1},
         {"id": "a", "generator": "terrain", "frames": 1},
     ]}
-    with pytest.raises(SpecError, match="duplicados"):
+    with pytest.raises(SpecError, match="duplicate"):
         load_spec(_write(tmp_path, spec))
 
 
@@ -60,6 +60,6 @@ def test_negative_seed_rejected(tmp_path) -> None:
 
 def test_bad_sample_rejected(tmp_path) -> None:
     spec = {"name": "x", "seed": 1, "items": [{"id": "a", "generator": "terrain", "frames": 1}],
-            "layout": {"sample": "muy"}}
+            "layout": {"sample": "very"}}
     with pytest.raises(SpecError, match="sample"):
         load_spec(_write(tmp_path, spec))

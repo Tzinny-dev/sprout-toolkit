@@ -1,4 +1,4 @@
-"""Tests del generador `font` (bitmap font desde TTF)."""
+"""Tests for the `font` generator (bitmap font from TTF)."""
 from __future__ import annotations
 
 import json
@@ -17,7 +17,7 @@ def _opaque(img) -> bool:
     return img.getchannel("A").getbbox() is not None
 
 
-# ── Contrato del plug-in ────────────────────────────────────────────────
+# ── Plug-in contract ─────────────────────────────────────────────────────
 def test_registered() -> None:
     assert Font.id == "font"
     assert GENERATORS["font"] is Font
@@ -42,7 +42,7 @@ def test_custom_chars_subset() -> None:
         assert _opaque(fr.image)
 
 
-# ── Espacio: vacío a propósito, no un bug ────────────────────────────────
+# ── Space: intentionally empty, not a bug ────────────────────────────────
 def test_space_glyph_is_empty() -> None:
     frames = Font().generate(1, 95, 48, {})
     space = next(fr for fr in frames if fr.meta["char"] == " ")
@@ -54,7 +54,7 @@ def test_printable_glyphs_are_nonempty() -> None:
     for fr in frames:
         if fr.meta["char"] == " ":
             continue
-        assert _opaque(fr.image), f"carácter '{fr.meta['char']}' renderizó vacío"
+        assert _opaque(fr.image), f"character '{fr.meta['char']}' rendered empty"
 
 
 # ── Metadata ─────────────────────────────────────────────────────────────
@@ -65,14 +65,14 @@ def test_meta_has_char_and_advance() -> None:
         assert fr.meta["advance"] > 0
 
 
-# ── Determinismo (sin dependencia del seed) ──────────────────────────────
+# ── Determinism (no dependency on seed) ──────────────────────────────────
 def test_deterministic_regardless_of_seed() -> None:
     a = Font().generate(1, 2, 48, {"chars": "Aa"})
     b = Font().generate(999, 2, 48, {"chars": "Aa"})
     assert [f.image.tobytes() for f in a] == [f.image.tobytes() for f in b]
 
 
-# ── Paleta ───────────────────────────────────────────────────────────────
+# ── Palette ──────────────────────────────────────────────────────────────
 def test_default_fill_is_white() -> None:
     frames = Font().generate(1, 1, 48, {"chars": "A"})
     colors = {px[:3] for px in frames[0].image.getdata() if px[3] > 0}
@@ -85,13 +85,13 @@ def test_fill_override_applied() -> None:
     assert (10, 20, 30) in colors
 
 
-# ── font_path inválido ────────────────────────────────────────────────────
+# ── Invalid font_path ────────────────────────────────────────────────────
 def test_invalid_font_path_raises() -> None:
     with pytest.raises(ValueError, match="font_path"):
         Font().generate(1, 1, 48, {"chars": "A", "font_path": "/no/existe.ttf"})
 
 
-# ── Pipeline completo (spec -> atlas + manifest + index.ts) ─────────────
+# ── Full pipeline (spec -> atlas + manifest + index.ts) ──────────────────
 def test_spec_generates_all_outputs(tmp_path: Path) -> None:
     out = tmp_path / "out"
     _generate(SPEC, out, None, False)

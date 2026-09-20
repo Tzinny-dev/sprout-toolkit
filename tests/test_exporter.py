@@ -1,4 +1,4 @@
-"""Tests de `exporter.py`: modos de PNG, TexturePacker y mipmaps del atlas."""
+"""Tests for `exporter.py`: PNG modes, TexturePacker and atlas mipmaps."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -45,9 +45,9 @@ def test_apply_png_mode_png8_preserves_alpha() -> None:
     out = apply_png_mode(img, "png8")
     assert out.mode == "P"
     roundtrip = out.convert("RGBA")
-    assert roundtrip.getpixel((0, 0))[3] == 0           # esquina: transparente
-    assert roundtrip.getpixel((24, 10))[3] == 255       # solo círculo rojo: opaco
-    assert roundtrip.getpixel((28, 28))[3] == 128       # solapado: semitransparente
+    assert roundtrip.getpixel((0, 0))[3] == 0           # corner: transparent
+    assert roundtrip.getpixel((24, 10))[3] == 255       # red circle only: opaque
+    assert roundtrip.getpixel((28, 28))[3] == 128       # overlap: semi-transparent
 
 
 # ── build_texturepacker ───────────────────────────────────────────────────
@@ -91,7 +91,7 @@ def test_compute_mipmap_meta_stops_before_min_size() -> None:
     sheet = Image.new("RGBA", (16, 16), (0, 0, 0, 0))
     spec = load_spec(SPECS / "props.json")
     meta = compute_mipmap_meta(sheet, spec, levels=5)
-    # 16 -> 8 -> 4 -> (2, se descarta por < 4px)
+    # 16 -> 8 -> 4 -> (2, discarded for being < 4px)
     assert [lvl["w"] for lvl in meta] == [8, 4]
 
 
@@ -109,7 +109,7 @@ def test_write_mipmap_files_creates_expected_pngs(tmp_path: Path) -> None:
             assert img.size == (lvl["w"], lvl["h"])
 
 
-# ── build_sheet: anchor opt-in por frame ──────────────────────────────────
+# ── build_sheet: opt-in anchor per frame ───────────────────────────────────
 def test_build_sheet_includes_anchor_when_present() -> None:
     spec = load_spec(SPECS / "props.json")
     img = Image.new("RGBA", (spec.layout.frame_px, spec.layout.frame_px), (0, 0, 0, 0))

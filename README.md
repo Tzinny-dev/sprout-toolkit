@@ -4,129 +4,129 @@
 
 > Grow your 2D assets procedurally.
 
-Sprout es un toolkit de código abierto para **generación procedural determinista de assets 2D**
-destinados a [Expo](https://expo.dev) + [`react-native-skia`](https://github.com/Shopify/react-native-skia).
-Genera atlases, mapas de tiles, autotiles, bitmap fonts y shaders SkSL a partir de specs JSON.
+Sprout is an open-source toolkit for **deterministic procedural 2D asset generation**
+targeting [Expo](https://expo.dev) + [`react-native-skia`](https://github.com/Shopify/react-native-skia).
+It generates atlases, tilemaps, autotiles, bitmap fonts and SkSL shaders from JSON specs.
 
 ---
 
-## Arquitectura
+## Architecture
 
 ```
 sprout/
-├── sprout/                     # Paquete Python
+├── sprout/                     # Python package
 │   ├── __init__.py             #   __version__
 │   ├── cli.py                  #   CLI (Typer): generate, batch, watch, info, lint, diff, validate
 │   ├── exporter.py             #   Spritesheet packing, manifest.json, index.ts
-│   ├── spec.py                 #   Carga/validación de specs JSON (schema v0)
-│   ├── autotile.py             #   Máscaras 8-bit, lookup 16/47
-│   ├── sksl.py                 #   Shaders SkSL runtime (FBM value-noise)
-│   ├── assets/fonts/           #   Fuente empaquetada (viaja en el wheel)
-│   └── generators/             #   Plugins de generación
-│       ├── base.py             #     FrameData + Generator (contrato)
-│       ├── terrain.py          #     Tiles seamless + autotile
-│       ├── props.py            #     Objetos estáticos (5 kinds, anchor points)
-│       ├── particles.py        #     Bursts animados con easing
-│       ├── ui.py                #     Botón, slider, panel 9-patch
-│       ├── font.py              #     Bitmap font desde TTF (un glifo por frame)
+│   ├── spec.py                 #   Load/validate JSON specs (schema v0)
+│   ├── autotile.py             #   8-bit masks, 16/47 lookup
+│   ├── sksl.py                 #   Runtime SkSL shaders (FBM value-noise)
+│   ├── assets/fonts/           #   Bundled font (ships in the wheel)
+│   └── generators/             #   Generation plugins
+│       ├── base.py             #     FrameData + Generator (contract)
+│       ├── terrain.py          #     Seamless tiles + autotile
+│       ├── props.py            #     Static objects (5 kinds, anchor points)
+│       ├── particles.py        #     Animated bursts with easing
+│       ├── ui.py                #     Button, slider, 9-patch panel
+│       ├── font.py              #     Bitmap font from TTF (one glyph per frame)
 │       └── blob_walk.py        #     8-frame walk cycle
-├── specs/                      # Specs de ejemplo (uno por generador)
-├── tests/                      # 142 tests (determinismo, autotile, SkSL, generadores, CLI)
+├── specs/                      # Example specs (one per generator)
+├── tests/                      # 142 tests (determinism, autotile, SkSL, generators, CLI)
 ├── LICENSE                     # MIT
 └── pyproject.toml
 ```
 
-## Características
+## Features
 
-| Característica | Descripción |
+| Feature | Description |
 |---|---|
-| **Procgen determinista** | Seeds numéricas → assets reproducibles (testeable en CI). |
-| **Auto-tile 8-bit** | Máscara de autotile con 8 bits (N/E/S/W + diagonales), 16 o 47 variantes. |
-| **Bitmap fonts desde TTF** | Atlas de glifos con métricas de avance, listo para layout de texto. |
-| **Shaders SkSL runtime** | Shaders generados para Skia (FBM value-noise, tileable), sin engordar el bundle. |
-| **Introspección de specs** | `sprout info`/`sprout lint`/`sprout diff` para inspeccionar, validar calidad y comparar builds. |
-| **Exportación flexible** | PNG8/PNG24, formato TexturePacker, mipmaps del atlas — todo opt-in. |
+| **Deterministic procgen** | Numeric seeds → reproducible assets (testable in CI). |
+| **8-bit auto-tile** | 8-bit autotile mask (N/E/S/W + diagonals), 16 or 47 variants. |
+| **Bitmap fonts from TTF** | Glyph atlas with advance metrics, ready for text layout. |
+| **Runtime SkSL shaders** | Generated Skia shaders (FBM value-noise, tileable), no bundle weight added. |
+| **Spec introspection** | `sprout info`/`sprout lint`/`sprout diff` to inspect, validate quality, and compare builds. |
+| **Flexible export** | PNG8/PNG24, TexturePacker format, atlas mipmaps — all opt-in. |
 
-## Instalación
+## Installation
 
 ```bash
 pip install sprout-toolkit
-# o en desarrollo:
+# or for development:
 git clone https://github.com/Tzinny-dev/sprout-toolkit
 cd sprout-toolkit
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[test]"
 ```
 
-El comando instalado es `sprout` (no `sprout-toolkit` — ese es solo el nombre de distribución en PyPI).
+The installed command is `sprout` (not `sprout-toolkit` — that's just the PyPI distribution name).
 
-## Uso rápido
+## Quick start
 
-### Generar assets
+### Generate assets
 
 ```bash
-# Generar todos los assets definidos en specs/
+# Generate every asset defined under specs/
 sprout batch specs/ --out ./out
 
-# Generar un spec específico
+# Generate a specific spec
 sprout generate specs/demo.json --out ./out
 
-# Modo watch: regenera al detectar cambios en specs/ (Ctrl-C para salir)
+# Watch mode: regenerates when files under specs/ change (Ctrl-C to exit)
 sprout watch specs/ --out ./out --interval 1.0
 
-# Inspeccionar una spec (reporte humano o JSON)
+# Inspect a spec (human report or JSON)
 sprout info specs/particles.json
 sprout info --json specs/particles.json
 
-# Analizar calidad de una spec: padding de atlas + frames vacíos
+# Analyze spec quality: atlas padding + empty frames
 sprout lint specs/ui.json
 sprout lint --json specs/ui.json
 
-# Generar un atlas de bitmap font (ASCII imprimible, fuente empaquetada)
+# Generate a bitmap font atlas (printable ASCII, bundled font)
 sprout generate specs/font.json --out ./out
 
-# Comparar dos specs, o dos directorios de salida ya generados
+# Compare two specs, or two already-generated output directories
 sprout diff specs/props.json specs/ui.json
 sprout diff --json ./out/a ./out/b
 
-# Validar un spec
+# Validate a spec
 sprout validate specs/demo.json
 ```
 
-### Opciones de exportación (`generate` / `batch`)
+### Export options (`generate` / `batch`)
 
 ```bash
-# PNG8 (paleta indexada, atlas más liviano) o PNG24 (sin alpha)
+# PNG8 (indexed palette, lighter atlas) or PNG24 (no alpha)
 sprout generate specs/ui.json --png-mode png8
-sprout generate specs/autotile.json --png-mode png24   # solo si el atlas no usa transparencia
+sprout generate specs/autotile.json --png-mode png24   # only if the atlas has no transparency
 
-# Además de manifest.json, emite <name>.tpsheet.json (formato TexturePacker JSON Hash)
+# In addition to manifest.json, emit <name>.tpsheet.json (TexturePacker JSON Hash format)
 sprout generate specs/props.json --texturepacker
 
-# Cadena de mip levels del atlas (@0.5x, @0.25x, @0.125x por defecto)
+# Chain of atlas mip levels (@0.5x, @0.25x, @0.125x by default)
 sprout generate specs/particles.json --mipmaps
 sprout generate specs/particles.json --mipmaps --mipmap-levels 2
 ```
 
-`--png-mode` default es `rgba` (sin cambios). `png8` cuantiza a 256 colores
-preservando el canal alpha (ideal para paletas acotadas tipo pixel-art);
-`png24` descarta el alpha por completo — solo usarlo en atlases sin
-transparencia real (p. ej. `terrain`). `--texturepacker`/`--mipmaps` son
-opt-in y no afectan `manifest.json`/`index.ts`, salvo que `--mipmaps`
-agrega el bloque `mipmaps.levels` al manifest.
+`--png-mode` defaults to `rgba` (no change). `png8` quantizes to 256 colors
+while preserving the alpha channel (ideal for pixel-art-style limited
+palettes); `png24` drops alpha entirely — only use it on atlases with no
+real transparency (e.g. `terrain`). `--texturepacker`/`--mipmaps` are
+opt-in and don't affect `manifest.json`/`index.ts`, except that `--mipmaps`
+adds the `mipmaps.levels` block to the manifest.
 
-### Generadores disponibles
+### Available generators
 
-| `generator` | Descripción | Params |
+| `generator` | Description | Params |
 |-------------|-------------|--------|
-| `terrain` | Tiles de ruido seamless + autotile 16/47 | `contrast`, `lift`, `cells`, `octaves`, `bevel`, `autotile` |
-| `blob_walk` | Ciclo de caminata de 8 frames (hero blob) | colores (`body`, `outline`, `belly`, ...) |
-| `props` | Objetos estáticos: `rock`, `bush`, `chest`, `mushroom`, `flower` — cada frame incluye un anchor point (`frames[].anchor` en el manifest, calculado desde el bbox alpha real) | `kind`, `fill`, `outline` |
-| `particles` | Bursts animados: `spark`, `smoke`, `dust`, `bubble` | `kind`, `particles`, `core`, `trail` |
-| `ui` | Interfaz: `button` (estados normal/hover/pressed), `slider` (progreso + knob), `panel` (9-patch, `frames=9`) | `kind`, `fill`, `outline`, `accent` |
-| `font` | Bitmap font desde TTF, un glifo por frame (`frames` = `len(chars)`) | `chars`, `font_path`, `size`, `fill` |
+| `terrain` | Seamless noise tiles + 16/47 autotile | `contrast`, `lift`, `cells`, `octaves`, `bevel`, `autotile` |
+| `blob_walk` | 8-frame walk cycle (hero blob) | colors (`body`, `outline`, `belly`, ...) |
+| `props` | Static objects: `rock`, `bush`, `chest`, `mushroom`, `flower` — each frame includes an anchor point (`frames[].anchor` in the manifest, computed from the real alpha bbox) | `kind`, `fill`, `outline` |
+| `particles` | Animated bursts: `spark`, `smoke`, `dust`, `bubble` | `kind`, `particles`, `core`, `trail` |
+| `ui` | Interface: `button` (normal/hover/pressed states), `slider` (progress + knob), `panel` (9-patch, `frames=9`) | `kind`, `fill`, `outline`, `accent` |
+| `font` | Bitmap font from TTF, one glyph per frame (`frames` = `len(chars)`) | `chars`, `font_path`, `size`, `fill` |
 
-Ejemplo de spec con `props`:
+Example spec using `props`:
 
 ```json
 {
@@ -140,21 +140,21 @@ Ejemplo de spec con `props`:
 }
 ```
 
-## Desarrollo
+## Development
 
 ```bash
 pip install -e ".[test]"
 pytest -q
 ```
 
-CI (`.github/workflows/tests.yml`) corre la suite completa en cada push/PR.
+CI (`.github/workflows/tests.yml`) runs the full suite on every push/PR.
 
-## Créditos
+## Credits
 
-- `typer` + `Pillow` — CLI y generación de imágenes
-- **DejaVu Fonts** (`DejaVuSansMono-Bold.ttf`, empaquetada en `sprout/assets/fonts/`) —
-  licencia Bitstream Vera, ver `sprout/assets/fonts/DejaVuSansMono-Bold.LICENSE.txt`
+- `typer` + `Pillow` — CLI and image generation
+- **DejaVu Fonts** (`DejaVuSansMono-Bold.ttf`, bundled in `sprout/assets/fonts/`) —
+  Bitstream Vera license, see `sprout/assets/fonts/DejaVuSansMono-Bold.LICENSE.txt`
 
-## Licencia
+## License
 
-MIT — ver [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE).

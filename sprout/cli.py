@@ -1,6 +1,6 @@
-"""CLI `sprout`: generación procedural determinista de assets 2D para Expo.
+"""`sprout` CLI: deterministic procedural 2D asset generation for Expo.
 
-Uso:
+Usage:
   sprout generate specs/demo.json --out ../demo/assets/procgen
   sprout generate specs/demo.json --png-mode png8 --texturepacker --mipmaps
   sprout batch specs/ --out ../demo/assets/procgen
@@ -43,7 +43,7 @@ from .generators.base import FrameData
 from .spec import Spec, SpecError, load_spec
 
 app = typer.Typer(add_completion=False, no_args_is_help=True,
-                  help="sprout — assets 2D procedurales deterministas para Expo + react-native-skia.")
+                  help="sprout — deterministic procedural 2D assets for Expo + react-native-skia.")
 
 
 PNG_MODES = ("rgba", "png8", "png24")
@@ -82,7 +82,7 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
             or (mipmaps and not all((out / lvl["file"]).is_file() for lvl in mip_meta))
         )
         if missing_extra:
-            pass  # falta un artefacto opcional -> regenerar
+            pass  # an optional artifact is missing -> regenerate
         else:
             current = zlib.crc32(atlas_path.read_bytes()) & 0xFFFFFFFF
             probe = io.BytesIO()
@@ -116,29 +116,29 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
 
 @app.command()
 def generate(
-    spec: Path = typer.Argument(..., help="spec.json a generar"),
-    out: Path = typer.Option(None, "--out", "-o", help="directorio de salida (default: junto a la spec)"),
-    seed: int = typer.Option(None, "--seed", "-s", help=f"sobreescribe el seed de la spec"),
-    skip_existing: bool = typer.Option(False, "--skip-existing", help="no reescribe si el atlas ya existe con el mismo crc"),
-    png_mode: str = typer.Option("rgba", "--png-mode", help="formato del atlas: rgba | png8 | png24"),
-    texturepacker: bool = typer.Option(False, "--texturepacker", help="emite además <name>.tpsheet.json (formato TexturePacker JSON Hash)"),
-    mipmaps: bool = typer.Option(False, "--mipmaps", help="genera una cadena de mip levels del atlas (@0.5x, @0.25x, ...)"),
-    mipmap_levels: int = typer.Option(3, "--mipmap-levels", help="cantidad máxima de niveles de mip (con --mipmaps)"),
+    spec: Path = typer.Argument(..., help="spec.json to generate"),
+    out: Path = typer.Option(None, "--out", "-o", help="output directory (default: next to the spec)"),
+    seed: int = typer.Option(None, "--seed", "-s", help=f"override the spec's seed"),
+    skip_existing: bool = typer.Option(False, "--skip-existing", help="skip rewriting if the atlas already exists with the same crc"),
+    png_mode: str = typer.Option("rgba", "--png-mode", help="atlas format: rgba | png8 | png24"),
+    texturepacker: bool = typer.Option(False, "--texturepacker", help="also emit <name>.tpsheet.json (TexturePacker JSON Hash format)"),
+    mipmaps: bool = typer.Option(False, "--mipmaps", help="generate a chain of atlas mip levels (@0.5x, @0.25x, ...)"),
+    mipmap_levels: int = typer.Option(3, "--mipmap-levels", help="maximum number of mip levels (with --mipmaps)"),
 ) -> None:
-    """Genera spritesheet + manifest.json + index.ts desde una spec."""
+    """Generate spritesheet + manifest.json + index.ts from a spec."""
     if png_mode not in PNG_MODES:
-        typer.secho(f"--png-mode inválido '{png_mode}' (disponibles: {', '.join(PNG_MODES)})",
+        typer.secho(f"invalid --png-mode '{png_mode}' (available: {', '.join(PNG_MODES)})",
                     fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
     try:
         r = _generate(spec, out, seed, skip_existing, png_mode, texturepacker, mipmaps, mipmap_levels)
     except SpecError as e:
-        typer.secho(f"error en {spec}: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(f"error in {spec}: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
     s: Spec = r["spec"]
     if r["skipped"]:
-        typer.secho(f"[{s.name}] sin cambios (crc {r['crc']:08x}) — skip", fg=typer.colors.YELLOW)
+        typer.secho(f"[{s.name}] no changes (crc {r['crc']:08x}) — skip", fg=typer.colors.YELLOW)
         return
     typer.secho(
         f"[{s.name}] seed={s.seed} frames={s.total_frames} "
@@ -151,29 +151,29 @@ def generate(
 
 @app.command()
 def batch(
-    specs_dir: Path = typer.Argument(..., help="directorio (o glob) con specs"),
-    out: Path = typer.Option(None, "--out", "-o", help="directorio de salida común"),
-    skip_existing: bool = typer.Option(False, "--skip-existing", help="no reescribe atlases sin cambios"),
-    png_mode: str = typer.Option("rgba", "--png-mode", help="formato del atlas: rgba | png8 | png24"),
-    texturepacker: bool = typer.Option(False, "--texturepacker", help="emite además <name>.tpsheet.json (formato TexturePacker JSON Hash)"),
-    mipmaps: bool = typer.Option(False, "--mipmaps", help="genera una cadena de mip levels del atlas (@0.5x, @0.25x, ...)"),
-    mipmap_levels: int = typer.Option(3, "--mipmap-levels", help="cantidad máxima de niveles de mip (con --mipmaps)"),
+    specs_dir: Path = typer.Argument(..., help="directory (or glob) with specs"),
+    out: Path = typer.Option(None, "--out", "-o", help="common output directory"),
+    skip_existing: bool = typer.Option(False, "--skip-existing", help="skip rewriting atlases without changes"),
+    png_mode: str = typer.Option("rgba", "--png-mode", help="atlas format: rgba | png8 | png24"),
+    texturepacker: bool = typer.Option(False, "--texturepacker", help="also emit <name>.tpsheet.json (TexturePacker JSON Hash format)"),
+    mipmaps: bool = typer.Option(False, "--mipmaps", help="generate a chain of atlas mip levels (@0.5x, @0.25x, ...)"),
+    mipmap_levels: int = typer.Option(3, "--mipmap-levels", help="maximum number of mip levels (with --mipmaps)"),
 ) -> None:
-    """Genera todas las specs de un directorio (patrón *.json)."""
+    """Generate every spec in a directory (*.json pattern)."""
     if png_mode not in PNG_MODES:
-        typer.secho(f"--png-mode inválido '{png_mode}' (disponibles: {', '.join(PNG_MODES)})",
+        typer.secho(f"invalid --png-mode '{png_mode}' (available: {', '.join(PNG_MODES)})",
                     fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
     files = sorted(specs_dir.glob("*.json"))
     if not files:
-        typer.secho(f"no hay specs (*.json) en {specs_dir}", fg=typer.colors.RED, err=True)
+        typer.secho(f"no specs (*.json) found in {specs_dir}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
     failed = 0
     for f in files:
         try:
             _generate(f, out, None, skip_existing, png_mode, texturepacker, mipmaps, mipmap_levels)
         except SpecError as e:
-            typer.secho(f"error en {f}: {e}", fg=typer.colors.RED, err=True)
+            typer.secho(f"error in {f}: {e}", fg=typer.colors.RED, err=True)
             failed += 1
     typer.echo(f"[batch] {len(files) - failed}/{len(files)} specs ok")
     if failed:
@@ -181,12 +181,12 @@ def batch(
 
 
 @app.command()
-def validate(spec: Path = typer.Argument(..., help="spec.json a validar")) -> None:
-    """Valida la estructura y los plug-ins de una spec."""
+def validate(spec: Path = typer.Argument(..., help="spec.json to validate")) -> None:
+    """Validate a spec's structure and plugins."""
     try:
         s = load_spec(spec)
     except SpecError as e:
-        typer.secho(f"inválida: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(f"invalid: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
     typer.secho(
         f"[{s.name}] OK — items={[i.id for i in s.items]} "
@@ -197,14 +197,14 @@ def validate(spec: Path = typer.Argument(..., help="spec.json a validar")) -> No
 
 @app.command()
 def info(
-    spec: Path = typer.Argument(..., help="spec.json a inspeccionar"),
-    as_json: bool = typer.Option(False, "--json", help="salida machine-readable"),
+    spec: Path = typer.Argument(..., help="spec.json to inspect"),
+    as_json: bool = typer.Option(False, "--json", help="machine-readable output"),
 ) -> None:
-    """Reporte de una spec: items, frames, layout y tamaño estimado del atlas."""
+    """Report on a spec: items, frames, layout, and estimated atlas size."""
     try:
         s = load_spec(spec)
     except SpecError as e:
-        typer.secho(f"inválida: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(f"invalid: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
     cols = s.layout.cols
@@ -245,7 +245,7 @@ def info(
     typer.echo(f"  layout  : framePx={fpx} cols={cols} rows={rows} "
                f"tileLogical={s.layout.tile_logical} sample={s.layout.sample}")
     typer.echo(f"  atlas   : {s.filename} {atlas_w}x{atlas_h} ({s.total_frames} frames)")
-    typer.echo(f"  runtime : {'sí' if s.runtime else 'no'}")
+    typer.echo(f"  runtime : {'yes' if s.runtime else 'no'}")
     typer.echo("  items:")
     for it in s.items:
         extra = ""
@@ -265,8 +265,8 @@ PADDING_WARN_RATIO = 0.25
 
 
 def _lint_warnings(spec: Spec, items_frames: list[list[FrameData]]) -> list[dict]:
-    """Advertencias de calidad de una spec ya renderizada: padding de atlas
-    (celdas de grilla sin usar) y frames completamente transparentes."""
+    """Quality warnings for an already-rendered spec: atlas padding (unused
+    grid cells) and completely transparent frames."""
     warnings: list[dict] = []
 
     cols = spec.layout.cols
@@ -276,24 +276,24 @@ def _lint_warnings(spec: Spec, items_frames: list[list[FrameData]]) -> list[dict
     if capacity and unused / capacity > PADDING_WARN_RATIO:
         warnings.append({
             "check": "padding",
-            "message": f"{unused}/{capacity} celdas del atlas sin usar ({unused / capacity:.0%})",
+            "message": f"{unused}/{capacity} unused atlas cells ({unused / capacity:.0%})",
         })
 
     empty_ids = [
         fr.id
         for item, frames in zip(spec.items, items_frames, strict=True)
-        # el generador `font` produce glifos vacíos a propósito (el espacio
-        # no pinta ningún píxel) — no es un frame desperdiciado.
+        # the `font` generator produces empty glyphs on purpose (the space
+        # character paints no pixels) — not a wasted frame.
         if item.generator != "font"
         for fr in frames
-        # los tiles RGB (p. ej. terrain sin autotile) son opacos por diseño
-        # y no tienen canal alpha que consultar.
+        # RGB tiles (e.g. terrain without autotile) are opaque by design
+        # and have no alpha channel to check.
         if fr.image.mode == "RGBA" and fr.image.getchannel("A").getbbox() is None
     ]
     if empty_ids:
         warnings.append({
             "check": "empty_frames",
-            "message": f"{len(empty_ids)} frame(s) completamente transparentes",
+            "message": f"{len(empty_ids)} completely transparent frame(s)",
             "ids": empty_ids,
         })
 
@@ -302,31 +302,31 @@ def _lint_warnings(spec: Spec, items_frames: list[list[FrameData]]) -> list[dict
 
 @app.command()
 def lint(
-    spec: Path = typer.Argument(..., help="spec.json a analizar"),
-    as_json: bool = typer.Option(False, "--json", help="salida machine-readable"),
+    spec: Path = typer.Argument(..., help="spec.json to analyze"),
+    as_json: bool = typer.Option(False, "--json", help="machine-readable output"),
 ) -> None:
-    """Analiza una spec: padding de atlas y frames vacíos (renderiza para verificar)."""
+    """Analyze a spec: atlas padding and empty frames (renders to verify)."""
     try:
         s = load_spec(spec)
         items_frames = render_items(s)
     except SpecError as e:
-        typer.secho(f"inválida: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(f"invalid: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
     warnings = _lint_warnings(s, items_frames)
     if as_json:
         typer.echo(json.dumps({"spec": str(spec), "warnings": warnings}, indent=2))
     elif not warnings:
-        typer.secho(f"[{s.name}] OK — sin advertencias", fg=typer.colors.GREEN)
+        typer.secho(f"[{s.name}] OK — no warnings", fg=typer.colors.GREEN)
     else:
-        typer.secho(f"[{s.name}] {len(warnings)} advertencia(s):", fg=typer.colors.YELLOW)
+        typer.secho(f"[{s.name}] {len(warnings)} warning(s):", fg=typer.colors.YELLOW)
         for w in warnings:
             typer.echo(f"  - [{w['check']}] {w['message']}")
     raise typer.Exit(1 if warnings else 0)
 
 
 def _diff_specs(a: Spec, b: Spec) -> list[dict]:
-    """Diferencias estructurales entre dos specs: `[{"field", "a", "b"}, ...]`."""
+    """Structural differences between two specs: `[{"field", "a", "b"}, ...]`."""
     diffs: list[dict] = []
 
     for field in ("name", "seed", "target"):
@@ -372,7 +372,7 @@ def _diff_specs(a: Spec, b: Spec) -> list[dict]:
 
 
 def _diff_outputs(a: Path, b: Path) -> list[dict]:
-    """Diferencias entre dos directorios de salida: CRC del atlas + manifest.json."""
+    """Differences between two output directories: atlas CRC + manifest.json."""
     diffs: list[dict] = []
 
     atlas_a, atlas_b = a / "atlas.png", b / "atlas.png"
@@ -417,14 +417,14 @@ def _diff_outputs(a: Path, b: Path) -> list[dict]:
 
 @app.command()
 def diff(
-    a: Path = typer.Argument(..., help="spec.json o directorio de salida A"),
-    b: Path = typer.Argument(..., help="spec.json o directorio de salida B"),
-    as_json: bool = typer.Option(False, "--json", help="salida machine-readable"),
+    a: Path = typer.Argument(..., help="spec.json or output directory A"),
+    b: Path = typer.Argument(..., help="spec.json or output directory B"),
+    as_json: bool = typer.Option(False, "--json", help="machine-readable output"),
 ) -> None:
-    """Compara dos specs (.json) o dos directorios de salida (atlas+manifest)."""
+    """Compare two specs (.json) or two output directories (atlas+manifest)."""
     a_is_spec, b_is_spec = a.suffix == ".json", b.suffix == ".json"
     if a_is_spec != b_is_spec:
-        typer.secho("no se puede comparar una spec (.json) con un directorio de salida",
+        typer.secho("cannot compare a spec (.json) with an output directory",
                     fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
@@ -433,20 +433,20 @@ def diff(
             kind, diffs = "spec", _diff_specs(load_spec(a), load_spec(b))
         else:
             if not a.is_dir() or not b.is_dir():
-                typer.secho(f"directorio no encontrado: {a if not a.is_dir() else b}",
+                typer.secho(f"directory not found: {a if not a.is_dir() else b}",
                             fg=typer.colors.RED, err=True)
                 raise typer.Exit(1)
             kind, diffs = "output", _diff_outputs(a, b)
     except SpecError as e:
-        typer.secho(f"inválida: {e}", fg=typer.colors.RED, err=True)
+        typer.secho(f"invalid: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
     if as_json:
         typer.echo(json.dumps({"a": str(a), "b": str(b), "kind": kind, "diffs": diffs}, indent=2))
     elif not diffs:
-        typer.secho(f"sin diferencias ({kind})", fg=typer.colors.GREEN)
+        typer.secho(f"no differences ({kind})", fg=typer.colors.GREEN)
     else:
-        typer.secho(f"{len(diffs)} diferencia(s) ({kind}):", fg=typer.colors.YELLOW)
+        typer.secho(f"{len(diffs)} difference(s) ({kind}):", fg=typer.colors.YELLOW)
         for d in diffs:
             typer.echo(f"  - {d['field']}: {d['a']!r} -> {d['b']!r}")
     raise typer.Exit(1 if diffs else 0)
@@ -454,26 +454,26 @@ def diff(
 
 @app.command()
 def watch(
-    specs_dir: Path = typer.Argument(..., help="directorio con specs (*.json)"),
-    out: Path = typer.Option(None, "--out", "-o", help="directorio de salida (default: junto a cada spec)"),
-    interval: float = typer.Option(1.0, "--interval", "-i", help="sondaje de cambios en segundos"),
+    specs_dir: Path = typer.Argument(..., help="directory with specs (*.json)"),
+    out: Path = typer.Option(None, "--out", "-o", help="output directory (default: next to each spec)"),
+    interval: float = typer.Option(1.0, "--interval", "-i", help="change-polling interval in seconds"),
 ) -> None:
-    """Vigila specs/ y regenera assets cuando cambian (Ctrl-C para detener)."""
+    """Watch specs/ and regenerate assets when they change (Ctrl-C to stop)."""
     if not specs_dir.is_dir():
-        typer.secho(f"no existe el directorio: {specs_dir}", fg=typer.colors.RED, err=True)
+        typer.secho(f"directory does not exist: {specs_dir}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
     files = sorted(specs_dir.glob("*.json"))
     if not files:
-        typer.secho(f"no hay specs (*.json) en {specs_dir}", fg=typer.colors.RED, err=True)
+        typer.secho(f"no specs (*.json) found in {specs_dir}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
     typer.secho(
-        f"[watch] {specs_dir} -> {out or specs_dir} cada {interval}s "
-        f"({len(files)} specs) — Ctrl-C para salir",
+        f"[watch] {specs_dir} -> {out or specs_dir} every {interval}s "
+        f"({len(files)} specs) — Ctrl-C to exit",
         fg=typer.colors.CYAN,
     )
     mtimes: dict[Path, float] = {}
-    primera = True
+    first = True
     try:
         while True:
             for f in sorted(specs_dir.glob("*.json")):
@@ -484,8 +484,8 @@ def watch(
                 if mtimes.get(f, 0.0) >= mt:
                     continue
                 mtimes[f] = mt
-                if not primera:
-                    typer.secho(f"  [cambio] {f.name}", fg=typer.colors.BLUE)
+                if not first:
+                    typer.secho(f"  [changed] {f.name}", fg=typer.colors.BLUE)
                 try:
                     r = _generate(f, out, None, True)
                 except SpecError as e:
@@ -493,7 +493,7 @@ def watch(
                     continue
                 s: Spec = r["spec"]
                 if r["skipped"]:
-                    typer.secho(f"  [skip]  {s.name} sin cambios (crc {r['crc']:08x})",
+                    typer.secho(f"  [skip]  {s.name} no changes (crc {r['crc']:08x})",
                                 fg=typer.colors.YELLOW)
                 else:
                     typer.secho(
@@ -501,14 +501,14 @@ def watch(
                         f"-> {r['out'].resolve()} (crc {r['crc']:08x})",
                         fg=typer.colors.GREEN,
                     )
-            primera = False
+            first = False
             time.sleep(interval)
     except KeyboardInterrupt:
-        typer.secho("\n[watch] detenido.", fg=typer.colors.CYAN)
+        typer.secho("\n[watch] stopped.", fg=typer.colors.CYAN)
 
 
 @app.callback(invoke_without_command=True)
-def _version(version: bool = typer.Option(False, "--version", help="muestra la versión")) -> None:
+def _version(version: bool = typer.Option(False, "--version", help="show the version")) -> None:
     if version:
         typer.echo(f"sprout {__version__}")
         raise typer.Exit()

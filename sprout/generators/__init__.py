@@ -1,10 +1,10 @@
-"""Registro de plug-ins de generación.
+"""Registry of generation plug-ins.
 
-Todo generador es una subclase de ``Generator`` con ``id`` único. La spec
-referencia generadores por su ``id`` (campo ``generator`` del item).
+Every generator is a subclass of ``Generator`` with a unique ``id``. The
+spec references generators by their ``id`` (the item's ``generator`` field).
 
-Principios: determinismo estricto (seed -> bytes), cero red, y separación
-entre "base shapes" (máscaras) y "relleno" (noise).
+Principles: strict determinism (seed -> bytes), zero network access, and a
+separation between "base shapes" (masks) and "fill" (noise).
 """
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ GENERATORS: dict[str, type[Generator]] = {
 
 def get_generator(identifier: str) -> type[Generator]:
     if identifier not in GENERATORS:
-        raise KeyError(f"generator desconocido: {identifier}")
+        raise KeyError(f"unknown generator: {identifier}")
     return GENERATORS[identifier]
 
 

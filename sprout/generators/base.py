@@ -1,4 +1,4 @@
-"""Contrato de los plug-ins de generación."""
+"""Contract for generation plug-ins."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -16,7 +16,7 @@ class FrameData:
 
 
 class Generator:
-    """Clase base. Los generadores producen frames deterministas dado un seed."""
+    """Base class. Generators produce deterministic frames given a seed."""
 
     id = ""
 
@@ -26,6 +26,6 @@ class Generator:
         count: int,
         frame_px: int,
         params: dict,
-        base: int = 0,  # índice global del primer frame (para variación por posición)
+        base: int = 0,  # global index of the first frame (for position-based variation)
     ) -> list[FrameData]:
         raise NotImplementedError

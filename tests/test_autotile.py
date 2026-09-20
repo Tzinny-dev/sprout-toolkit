@@ -1,4 +1,4 @@
-"""Tests del builder autotile 16/47."""
+"""Tests for the 16/47 autotile builder."""
 from __future__ import annotations
 
 import json
@@ -36,13 +36,13 @@ def test_masks_counts_and_order() -> None:
 def test_canonical_rule() -> None:
     n, ne, e, se, s, sw, w, nw = (autotile.N, autotile.NE, autotile.E, autotile.SE,
                                   autotile.S, autotile.SW, autotile.W, autotile.NW)
-    # diagonal aislada no cuenta
+    # an isolated diagonal doesn't count
     assert autotile.canonical_47(ne) == 0
     assert autotile.canonical_47(nw | ne | se | sw) == 0
-    # diagonal cuenta solo con ambos cardinales
+    # diagonal only counts with both cardinals present
     assert autotile.canonical_47(n | e | ne) == n | e | ne
     assert autotile.canonical_47(n | ne) == n
-    # 16 colapsa a los 4 lados
+    # 16 collapses to the 4 sides
     assert autotile.canonical_16(n | ne | e | se | s | sw | w | nw) == n | e | s | w
 
 
@@ -103,7 +103,7 @@ def test_index_ts_exposes_autotile_helpers(tmp_path: Path) -> None:
 
 def _tile_edge_continuity(size: int = 47, frame_px: int = 24,
                           trials: int = 40) -> int:
-    """Cuenta desajustes de tierra en bordes compartidos por tiles de tierra."""
+    """Count land mismatches on edges shared by land tiles."""
     n, e, s, w = autotile.N, autotile.E, autotile.S, autotile.W
     eps = 0.5 / frame_px
     bevel = 0.16
@@ -148,13 +148,13 @@ def test_geometry_47_is_seamless() -> None:
 
 
 def test_match_sides_is_inset_rectangle() -> None:
-    """En 16 la silueta es el rectángulo retraído ``bevel`` de cada lado sin vecino."""
+    """In 16, the silhouette is the rectangle inset by ``bevel`` on each side with no neighbor."""
     n, e, s, w = autotile.N, autotile.E, autotile.S, autotile.W
     bevel = 0.25
     inside = (0.5, 0.5)
-    assert _land(n | e | s | w, 16, *inside, bevel)  # todo conectado -> lleno
-    # con W ausente, un punto pegado al borde oeste queda fuera; el resto dentro
+    assert _land(n | e | s | w, 16, *inside, bevel)  # everything connected -> full
+    # with W absent, a point against the west edge is outside; the rest stays inside
     assert not _land(n | e | s, 16, 0.1, 0.5, bevel)
     assert _land(n | e | s, 16, 0.4, 0.5, bevel)
-    # las diagonales no alteran la silueta 16
+    # diagonals don't alter the 16 silhouette
     assert _land(n | e | s, 16, 0.4, 0.5, bevel) == _land(n | e | s | autotile.NE, 16, 0.4, 0.5, bevel)

@@ -1,15 +1,15 @@
-"""Generador ``particles``: bursts animados de partículas con easing.
+"""``particles`` generator: animated particle bursts with easing.
 
-Cada frame es un cuadro del mismo burst: las partículas se expanden radialmente
-desde el centro con un *ease-out cubic*, encogiéndose y desvaneciéndose con el
-progreso. El seed fija ángulo/velocidad/vida/tamaño de cada partícula, de modo
-que la animación completa es determinista y reproducible.
+Each frame is a snapshot of the same burst: particles expand radially
+from the center with an *ease-out cubic*, shrinking and fading out as
+progress advances. The seed fixes angle/speed/life/size for each particle,
+so the whole animation is deterministic and reproducible.
 
-Parámetros de spec (item.params):
+Spec parameters (item.params):
     kind      : "spark" | "smoke" | "dust" | "bubble"  (default "spark")
-    particles : número de partículas (default 12, mínimo 2)
-    core      : [r, g, b]  color del núcleo (override opcional)
-    trail     : [r, g, b]  color de la estela (override opcional)
+    particles : number of particles (default 12, minimum 2)
+    core      : [r, g, b]  core color (optional override)
+    trail     : [r, g, b]  trail color (optional override)
 """
 from __future__ import annotations
 
@@ -20,25 +20,25 @@ from PIL import Image, ImageDraw
 from .base import FrameData, Generator
 
 
-# ── Hash determinista (idéntico al de terrain/props) ────────────────────
+# ── Deterministic hash (identical to the one in terrain/props) ──────────
 def _cell(i: int, j: int, seed: int) -> float:
     h = (i * 374761393 + j * 668265263 + seed * 974711377) % 2**32
     return ((h >> 8) % 2**24) / 2**24
 
 
 def _rnd(seed: int, i: int) -> float:
-    """Valor ubicuo [0, 1) para variación por partícula."""
+    """Ubiquitous [0, 1) value for per-particle variation."""
     return _cell(i, 0, seed)
 
 
 def ease_out_cubic(t: float) -> float:
-    """Easing de desaceleración: 1 - (1-t)^3, con t saturado a [0, 1]."""
+    """Deceleration easing: 1 - (1-t)^3, with t clamped to [0, 1]."""
     t = max(0.0, min(1.0, t))
     return 1.0 - (1.0 - t) ** 3
 
 
 class Particles(Generator):
-    """Bursts animados: chispas, humo, polvo y burbujas."""
+    """Animated bursts: sparks, smoke, dust and bubbles."""
 
     id = "particles"
 
@@ -49,12 +49,12 @@ class Particles(Generator):
         "bubble": {"core": (225, 245, 255), "trail": (120, 185, 235)},
     }
 
-    # Por kind: (alcance relativo, encogimiento, gravedad relativa)
+    # Per kind: (relative reach, shrink amount, relative gravity)
     MOTION: dict[str, tuple[float, float, float]] = {
-        "spark":  (0.46, 0.72, -0.10),  # sube y se apaga
-        "smoke":  (0.34, 0.30,  0.20),  # flota hacia arriba
-        "dust":   (0.40, 0.55,  0.06),  # se asienta
-        "bubble": (0.30, 0.15, -0.24),  # asciende
+        "spark":  (0.46, 0.72, -0.10),  # rises and fades out
+        "smoke":  (0.34, 0.30,  0.20),  # floats upward
+        "dust":   (0.40, 0.55,  0.06),  # settles down
+        "bubble": (0.30, 0.15, -0.24),  # ascends
     }
 
     def generate(
@@ -68,8 +68,8 @@ class Particles(Generator):
         kind = params.get("kind", "spark")
         if kind not in self.KIND_DEFAULTS:
             raise ValueError(
-                f"particles.kind inválido '{kind}' "
-                f"(disponibles: {', '.join(sorted(self.KIND_DEFAULTS))})"
+                f"invalid particles.kind '{kind}' "
+                f"(available: {', '.join(sorted(self.KIND_DEFAULTS))})"
             )
         palette: dict = dict(self.KIND_DEFAULTS[kind])
         for key in ("core", "trail"):
@@ -93,9 +93,9 @@ class Particles(Generator):
             max_r = frame_px * reach
 
             for k in range(n_part):
-                # Índices con paso 1: el hash `_cell` avanza ~0.087 por unidad
-                # de índice, así que un paso 1 reparte bien los valores; un
-                # paso 6 los agruparía en ~2 valores (arcos enfrentados).
+                # Step-1 indices: the `_cell` hash advances ~0.087 per index
+                # unit, so a step of 1 spreads the values well; a step of 6
+                # would cluster them into ~2 values (opposing arcs).
                 ang = math.tau * _rnd(vs, k)
                 speed = 0.55 + 0.45 * _rnd(vs, 100 + k)
                 life = 0.55 + 0.45 * _rnd(vs, 200 + k)
@@ -105,7 +105,7 @@ class Particles(Generator):
 
                 p = t / life
                 if p >= 1.0:
-                    continue  # partícula ya extinguida
+                    continue  # particle has already died out
                 e = ease_out_cubic(p)
                 dist = start + e * speed * max_r
                 px = cx + math.cos(ang) * dist
@@ -115,9 +115,10 @@ class Particles(Generator):
                 if rad < 0.5 or alpha <= 0:
                     continue
 
-                # Estela (detrás, más grande y tenue). Se compone en su propia
-                # capa: PIL reemplaza píxeles al dibujar sobre RGBA, así que
-                # sin alpha_composite las partículas se "cortarían" entre sí.
+                # Trail (behind, bigger and dimmer). Composited on its own
+                # layer: PIL overwrites pixels when drawing onto RGBA, so
+                # without alpha_composite the particles would "cut into" each
+                # other.
                 tr = rad * 1.4
                 tl = Image.new("RGBA", (frame_px, frame_px), (0, 0, 0, 0))
                 ImageDraw.Draw(tl).ellipse(
@@ -125,7 +126,7 @@ class Particles(Generator):
                     fill=trail + (max(1, int(alpha * 0.30)),))
                 frame = Image.alpha_composite(frame, tl)
 
-                # Núcleo
+                # Core
                 cl = Image.new("RGBA", (frame_px, frame_px), (0, 0, 0, 0))
                 ImageDraw.Draw(cl).ellipse(
                     [px - rad, py - rad, px + rad, py + rad],

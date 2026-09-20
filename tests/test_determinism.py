@@ -1,4 +1,4 @@
-"""Tests de determinismo y contrato de salida."""
+"""Determinism and output contract tests."""
 from __future__ import annotations
 
 import json
@@ -61,7 +61,7 @@ def test_index_ts_references_atlas_and_types(tmp_path: Path) -> None:
     assert "export const manifest: Manifest = require('./manifest.json')" in src
     assert "export function framesFor" in src
     assert "FilterMode.Nearest" in src
-    # helpers de worklets/buffers (§8.2)
+    # worklet/buffer helpers (§8.2)
     assert "export function rectFor" in src
     assert "export const frameScale" in src
     assert "export const atlasSampling" in src
@@ -75,18 +75,18 @@ def test_index_ts_references_atlas_and_types(tmp_path: Path) -> None:
 
 
 def test_index_ts_inset_and_scale_compensation(tmp_path: Path) -> None:
-    """Regresión del fix de sangrado entre frames (DPR no entero).
+    """Regression test for the cross-frame bleed fix (non-integer DPR).
 
-    La paridad byte-a-byte entre corridas no detecta cambios de plantilla
-    (los assets viejos de la demo quedaron obsoletos sin que fallara nada).
-    Esto verifica el contenido del contrato: inset de medio texel en rectFor
-    contra el bleed del atlas con muestreo nearest, y compensación de escala
-    en useAtlasSprites para que el destino siga siendo scale * framePx.
+    Byte-for-byte parity between runs doesn't catch template changes (the
+    demo's old assets went stale without anything failing). This checks the
+    contract's actual content: a half-texel inset in rectFor against the
+    atlas bleed under nearest sampling, and the scale compensation in
+    useAtlasSprites so the destination still ends up as scale * framePx.
     """
     out = tmp_path / "out"
     _generate(SPEC, out, None, False)
     src = (out / "index.ts").read_text()
-    # rectFor: inset de medio texel
+    # rectFor: half-texel inset
     assert "const e = 0.5;" in src
     assert "x: f.x + e, y: f.y + e, w: f.w - 2 * e, h: f.h - 2 * e" in src
     # useAtlasSprites: escala compensada (frames[i].w / rects[i].w) aplicada
@@ -95,7 +95,7 @@ def test_index_ts_inset_and_scale_compensation(tmp_path: Path) -> None:
 
 
 def test_index_ts_batch_helpers(tmp_path: Path) -> None:
-    """Modo batch imperativo (§11): drawAtlas en un SkPicture."""
+    """Imperative batch mode (§11): drawAtlas on a SkPicture."""
     out = tmp_path / "out"
     _generate(SPEC, out, None, False)
     src = (out / "index.ts").read_text()

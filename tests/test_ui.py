@@ -1,4 +1,4 @@
-"""Tests del generador `ui` (botones, sliders, paneles 9-patch)."""
+"""Tests for the `ui` generator (buttons, sliders, 9-patch panels)."""
 from __future__ import annotations
 
 import json
@@ -22,7 +22,7 @@ def _opaque(img) -> bool:
     return img.getchannel("A").getbbox() is not None
 
 
-# ── Contrato del plug-in ────────────────────────────────────────────────
+# ── Plugin contract ────────────────────────────────────────────────
 def test_registered() -> None:
     assert Ui.id == "ui"
     assert GENERATORS["ui"] is Ui
@@ -69,7 +69,7 @@ def test_panel_requires_9_frames() -> None:
         Ui().generate(1, 10, 64, {"kind": "panel"})
 
 
-# ── Determinismo ────────────────────────────────────────────────────────
+# ── Determinism ────────────────────────────────────────────────────────
 def test_same_seed_is_byte_identical() -> None:
     a = Ui().generate(42, 3, 64, {"kind": "button"})
     b = Ui().generate(42, 3, 64, {"kind": "button"})
@@ -81,32 +81,32 @@ def test_same_seed_is_byte_identical() -> None:
 
 
 def test_panel_deterministic_regardless_of_seed() -> None:
-    """El panel no usa variación por seed: es una construcción geométrica fija."""
+    """The panel doesn't vary by seed: it's a fixed geometric construction."""
     a = Ui().generate(1, 9, 64, {"kind": "panel"})
     b = Ui().generate(999, 9, 64, {"kind": "panel"})
     assert [f.image.tobytes() for f in a] == [f.image.tobytes() for f in b]
 
 
-# ── Contenido específico por kind ────────────────────────────────────────
+# ── Kind-specific content ────────────────────────────────────────
 def test_button_states_differ() -> None:
-    """normal/hover/pressed deben producir bytes distintos entre sí."""
+    """normal/hover/pressed must produce distinct bytes from each other."""
     frames = Ui().generate(7, 3, 64, {"kind": "button"})
     assert len({f.image.tobytes() for f in frames}) == 3
 
 
 def test_slider_frames_differ() -> None:
-    """El knob debe desplazarse: cada paso de progreso es distinto."""
+    """The knob must move: each progress step is distinct."""
     frames = Ui().generate(7, 6, 64, {"kind": "slider"})
     assert len({f.image.tobytes() for f in frames}) == 6
 
 
 def test_panel_patches_all_distinct() -> None:
-    """Esquinas/bordes/centro deben ser 9 tiles visualmente distintas."""
+    """Corners/edges/center must be 9 visually distinct tiles."""
     frames = Ui().generate(1, 9, 64, {"kind": "panel"})
     assert len({f.image.tobytes() for f in frames}) == 9
 
 
-# ── Paleta ───────────────────────────────────────────────────────────────
+# ── Palette ───────────────────────────────────────────────────────────────
 def test_color_override_applied_button() -> None:
     frames = Ui().generate(
         1, 1, 64, {"kind": "button", "fill": [10, 20, 30], "outline": [1, 2, 3]}
@@ -132,7 +132,7 @@ def test_size_scales_with_frame_px() -> None:
         assert frames[0].image.size == (size, size)
 
 
-# ── Pipeline completo (spec -> atlas + manifest + index.ts) ─────────────
+# ── Full pipeline (spec -> atlas + manifest + index.ts) ─────────────
 def test_spec_generates_all_outputs(tmp_path: Path) -> None:
     out = tmp_path / "out"
     _generate(SPEC, out, None, False)

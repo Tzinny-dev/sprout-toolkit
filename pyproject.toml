@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "sprout-toolkit"
-version = "0.1.0"
-description = "Generación procedural determinista de assets 2D para Expo + react-native-skia"
+version = "0.1.1"
+description = "Deterministic procedural 2D asset generation for Expo + react-native-skia"
 readme = "README.md"
 authors = [{ name = "Tzinny" }]
 requires-python = ">=3.10"

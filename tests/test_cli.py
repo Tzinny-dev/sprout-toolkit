@@ -1,4 +1,4 @@
-"""Tests del contrato CLI: comandos registrados, info y modo watch."""
+"""Tests for the CLI contract: registered commands, info, and watch mode."""
 from __future__ import annotations
 
 import json
@@ -34,7 +34,7 @@ def _wait(pred: Callable[[], bool], timeout: float, what: str) -> None:
         if pred():
             return
         time.sleep(0.1)
-    raise AssertionError(f"timeout esperando: {what}")
+    raise AssertionError(f"timeout waiting for: {what}")
 
 
 def test_commands_registered() -> None:
@@ -55,7 +55,7 @@ def test_watch_regenerates_on_spec_change(tmp_path: Path) -> None:
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
     )
     try:
-        _wait(lambda: atlas.is_file(), 20, "generación inicial del watch")
+        _wait(lambda: atlas.is_file(), 20, "initial watch generation")
         crc1 = _crc(atlas)
 
         raw = json.loads(spec.read_text())
@@ -63,7 +63,7 @@ def test_watch_regenerates_on_spec_change(tmp_path: Path) -> None:
         spec.write_text(json.dumps(raw))
 
         _wait(lambda: atlas.is_file() and _crc(atlas) != crc1, 20,
-              "regeneración tras cambio de seed")
+              "regeneration after seed change")
         assert _crc(atlas) != crc1
     finally:
         proc.terminate()
@@ -74,7 +74,7 @@ def test_watch_regenerates_on_spec_change(tmp_path: Path) -> None:
 
 
 def test_watch_skips_unchanged_spec(tmp_path: Path) -> None:
-    """Tocar la spec sin cambiar su contenido -> skip (crc idéntico)."""
+    """Touching the spec without changing its content -> skip (identical crc)."""
     spec_dir = tmp_path / "specs"
     spec_dir.mkdir()
     spec = spec_dir / "p.json"
@@ -88,11 +88,11 @@ def test_watch_skips_unchanged_spec(tmp_path: Path) -> None:
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
     )
     try:
-        _wait(lambda: atlas.is_file(), 20, "generación inicial")
+        _wait(lambda: atlas.is_file(), 20, "initial generation")
         crc1 = _crc(atlas)
-        spec.touch()  # cambia mtime, no contenido
+        spec.touch()  # changes mtime, not content
         time.sleep(1.5)
-        assert _crc(atlas) == crc1  # el atlas no cambia
+        assert _crc(atlas) == crc1  # the atlas doesn't change
     finally:
         proc.terminate()
         try:
@@ -101,7 +101,7 @@ def test_watch_skips_unchanged_spec(tmp_path: Path) -> None:
             proc.kill()
 
 
-# ── Comando `info` ──────────────────────────────────────────────────────
+# ── `info` command ───────────────────────────────────────────────────────
 def test_info_json_matches_spec() -> None:
     result = runner.invoke(app, ["info", "--json", str(SPECS / "demo.json")])
     assert result.exit_code == 0, result.output
@@ -129,7 +129,7 @@ def test_info_human_readable() -> None:
 
 def test_info_invalid_spec_exits_1(tmp_path: Path) -> None:
     bad = tmp_path / "bad.json"
-    bad.write_text('{"name": "x"}')  # falta seed/items
+    bad.write_text('{"name": "x"}')  # missing seed/items
     result = runner.invoke(app, ["info", str(bad)])
     assert result.exit_code == 1
 
@@ -139,7 +139,7 @@ def test_info_missing_file_exits_1(tmp_path: Path) -> None:
     assert result.exit_code == 1
 
 
-# ── Comando `lint` ───────────────────────────────────────────────────────
+# ── `lint` command ───────────────────────────────────────────────────────
 def test_lint_clean_spec_exits_zero() -> None:
     result = runner.invoke(app, ["lint", str(SPECS / "ui.json")])
     assert result.exit_code == 0, result.output
@@ -173,14 +173,14 @@ def test_lint_detects_padding(tmp_path: Path) -> None:
 
 def test_lint_invalid_spec_exits_1(tmp_path: Path) -> None:
     bad = tmp_path / "bad.json"
-    bad.write_text('{"name": "x"}')  # falta seed/items
+    bad.write_text('{"name": "x"}')  # missing seed/items
     result = runner.invoke(app, ["lint", str(bad)])
     assert result.exit_code == 1
 
 
 def test_lint_warnings_flags_empty_frames() -> None:
-    """Unitario: `_lint_warnings` detecta frames totalmente transparentes
-    sin depender de que algún generador real produzca uno vacío."""
+    """Unit test: `_lint_warnings` detects fully transparent frames without
+    depending on some real generator producing an empty one."""
     spec = load_spec(SPECS / "ui.json")  # 3 items: btn, slider, panel
     empty = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
     items_frames = [[], [], [FrameData(id="ghost_00", image=empty)]]
@@ -190,8 +190,8 @@ def test_lint_warnings_flags_empty_frames() -> None:
 
 
 def test_lint_ignores_rgb_frames_without_alpha() -> None:
-    """Los tiles RGB (terrain sin autotile) no tienen canal alpha: no deben
-    dispararse como falso positivo de `empty_frames`."""
+    """RGB tiles (terrain without autotile) have no alpha channel: they must
+    not trigger a false positive for `empty_frames`."""
     spec = load_spec(SPECS / "ui.json")  # 3 items: btn, slider, panel
     rgb_frame = Image.new("RGB", (64, 64), (10, 10, 10))
     items_frames = [[], [], [FrameData(id="tile_00", image=rgb_frame)]]
@@ -200,8 +200,8 @@ def test_lint_ignores_rgb_frames_without_alpha() -> None:
 
 
 def test_lint_terrain_spec_no_false_positive() -> None:
-    """`demo.json` mezcla frames RGBA (hero) y RGB (tiles): no debe fallar
-    ni marcar falsos positivos de frames vacíos."""
+    """`demo.json` mixes RGBA frames (hero) and RGB frames (tiles): it must
+    not fail or flag false positives for empty frames."""
     result = runner.invoke(app, ["lint", "--json", str(SPECS / "demo.json")])
     assert result.exit_code == 0, result.output
     data = json.loads(result.stdout)
@@ -209,15 +209,15 @@ def test_lint_terrain_spec_no_false_positive() -> None:
 
 
 def test_lint_font_spec_ignores_blank_space_glyph() -> None:
-    """El espacio en `font.json` es un frame vacío a propósito: `lint` no
-    debe marcarlo como `empty_frames`."""
+    """The space in `font.json` is intentionally an empty frame: `lint`
+    must not flag it as `empty_frames`."""
     result = runner.invoke(app, ["lint", "--json", str(SPECS / "font.json")])
     assert result.exit_code == 0, result.output
     data = json.loads(result.stdout)
     assert not any(w["check"] == "empty_frames" for w in data["warnings"])
 
 
-# ── Comando `diff` ───────────────────────────────────────────────────────
+# ── `diff` command ───────────────────────────────────────────────────────
 def _write_spec(path: Path, **overrides) -> None:
     base = {
         "name": "diff_atlas",
@@ -238,7 +238,7 @@ def test_diff_specs_identical(tmp_path: Path) -> None:
     _write_spec(b)
     result = runner.invoke(app, ["diff", str(a), str(b)])
     assert result.exit_code == 0, result.output
-    assert "sin diferencias" in result.stdout
+    assert "no differences" in result.stdout
 
 
 def test_diff_specs_detects_changes(tmp_path: Path) -> None:
@@ -275,7 +275,7 @@ def test_diff_outputs_identical(tmp_path: Path) -> None:
     _generate(spec, out_b, None, False)
     result = runner.invoke(app, ["diff", str(out_a), str(out_b)])
     assert result.exit_code == 0, result.output
-    assert "sin diferencias" in result.stdout
+    assert "no differences" in result.stdout
 
 
 def test_diff_outputs_detects_seed_change(tmp_path: Path) -> None:
@@ -309,7 +309,7 @@ def test_diff_json_output_shape(tmp_path: Path) -> None:
     assert data["diffs"] == []
 
 
-# ── Exportación: --png-mode / --texturepacker / --mipmaps ────────────────
+# ── Export: --png-mode / --texturepacker / --mipmaps ─────────────────────
 def test_generate_png_mode_png8(tmp_path: Path) -> None:
     spec = tmp_path / "spec.json"
     _write_spec(spec)
@@ -374,12 +374,12 @@ def test_generate_mipmaps_custom_level_count(tmp_path: Path) -> None:
 
 
 def test_skip_existing_still_generates_missing_texturepacker(tmp_path: Path) -> None:
-    """`skip_existing` no debe impedir que se emita un artefacto opcional
-    que todavía no existía en una corrida anterior."""
+    """`skip_existing` must not prevent an optional artifact from being
+    emitted if it didn't exist yet from a previous run."""
     spec = tmp_path / "spec.json"
     _write_spec(spec)
     out = tmp_path / "out"
-    _generate(spec, out, None, False)  # primera corrida sin --texturepacker
+    _generate(spec, out, None, False)  # first run without --texturepacker
     tp_path = out / "diff_atlas.tpsheet.json"
     assert not tp_path.is_file()
 
@@ -391,8 +391,8 @@ def test_skip_existing_still_generates_missing_texturepacker(tmp_path: Path) -> 
 
 
 def test_skip_existing_works_with_non_default_png_mode(tmp_path: Path) -> None:
-    """El probe de CRC usado por `skip_existing` debe respetar `--png-mode`,
-    si no la detección de "sin cambios" queda rota para png8/png24."""
+    """The CRC probe used by `skip_existing` must respect `--png-mode`,
+    otherwise "no changes" detection would be broken for png8/png24."""
     spec = tmp_path / "spec.json"
     _write_spec(spec)
     out = tmp_path / "out"

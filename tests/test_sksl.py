@@ -1,4 +1,4 @@
-"""Tests del emisor SkSL (modalidad runtime, opt-in)."""
+"""Tests for the SkSL emitter (opt-in runtime mode)."""
 from __future__ import annotations
 
 import json
@@ -107,6 +107,6 @@ def test_skip_existing_covers_shader(tmp_path: Path) -> None:
     out = tmp_path / "out"
     assert _generate(SPEC, out, None, False)["skipped"] is False
     assert _generate(SPEC, out, None, True)["skipped"] is True
-    # tocar el .sksl fuerza regeneración
-    (out / "demo_runtime.sksl").write_text("// tocado\n")
+    # touching the .sksl file forces regeneration
+    (out / "demo_runtime.sksl").write_text("// touched\n")
     assert _generate(SPEC, out, None, True)["skipped"] is False

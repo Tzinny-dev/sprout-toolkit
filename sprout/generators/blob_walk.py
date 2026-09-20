@@ -1,10 +1,10 @@
-"""Generador `blob_walk`: hero blob pixel-art con ciclo de caminata.
+"""`blob_walk` generator: pixel-art hero blob with a walk cycle.
 
-El ciclo de 8 frames se construye a partir de la pose base añadiendo un
-offset de fase ``t = (frame % 4)/4``: las piernas balancean con ``sin(tau*t)``
-y el cuerpo respira/brinca. Las constantes micro están calibradas para
-``frame_px = 64`` (paridad byte-a-byte con el prototipo de la demo); el cuerpo
-escala proporcionalmente al tamaño pedido.
+The 8-frame cycle is built from the base pose by adding a phase offset
+``t = (frame % 4)/4``: the legs swing with ``sin(tau*t)`` and the body
+breathes/bounces. The micro constants are calibrated for ``frame_px = 64``
+(byte-for-byte parity with the demo prototype); the body scales
+proportionally to the requested size.
 """
 from __future__ import annotations
 
