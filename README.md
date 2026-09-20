@@ -8,6 +8,13 @@ Sprout is an open-source toolkit for **deterministic procedural 2D asset generat
 targeting [Expo](https://expo.dev) + [`react-native-skia`](https://github.com/Shopify/react-native-skia).
 It generates atlases, tilemaps, autotiles, bitmap fonts and SkSL shaders from JSON specs.
 
+![Hero blob walk cycle](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/hero_walk.gif)
+![Spark burst](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/spark.gif)
+
+> [!NOTE]
+> `pip install sprout` gets you an unrelated package — this project installs as
+> **`pip install sprout-toolkit`** (the command is still `sprout`).
+
 ---
 
 ## Architecture
@@ -46,6 +53,34 @@ sprout/
 | **Runtime SkSL shaders** | Generated Skia shaders (FBM value-noise, tileable), no bundle weight added. |
 | **Spec introspection** | `sprout info`/`sprout lint`/`sprout diff` to inspect, validate quality, and compare builds. |
 | **Flexible export** | PNG8/PNG24, TexturePacker format, atlas mipmaps — all opt-in. |
+
+## Showcase
+
+Everything below is generated from JSON specs — same seed, same pixels, every time.
+
+| | |
+|---|---|
+| ![Hero blob walk cycle, 8 frames](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/hero_walk.gif) | ![Spark burst, 8 frames](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/spark.gif) |
+| `blob_walk` — 8-frame walk cycle (`specs/demo.json`) | `particles/spark` — one-shot animated burst (`specs/particles.json`) |
+
+![Autotile island, 47 variants](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/island.png)
+
+`terrain` + 47-variant autotile: island assembled from `mask → frame` lookups
+(`specs/autotile.json`, `canonicalMask` in the generated `index.ts`).
+
+![Props atlas: rock, bush, chest, mushroom, flower](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/props.png)
+
+`props` — 5 kinds × deterministic variants, each frame with an anchor point
+(`specs/props.json`).
+
+![UI atlas: button states, sliders, 9-patch panels](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/ui.png)
+
+`ui` — button states, slider progress + knob, 9-patch panel (`specs/ui.json`).
+
+![SPROUT rendered with the generated bitmap font](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/sprout_text.png)
+
+`font` — bitmap font rasterized from the bundled TTF, with advance metrics for
+text layout (`specs/font.json`).
 
 ## Installation
 
