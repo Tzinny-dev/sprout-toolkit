@@ -16,10 +16,6 @@ It generates atlases, tilemaps, autotiles, bitmap fonts and SkSL shaders from JS
 ![Hero blob walk cycle](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/hero_walk.gif)
 ![Spark burst](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/spark.gif)
 
-> [!NOTE]
-> `pip install sprout` gets you an unrelated package — this project installs as
-> **`pip install sprout-toolkit`** (the command is still `sprout`).
-
 ---
 
 ## Architecture
