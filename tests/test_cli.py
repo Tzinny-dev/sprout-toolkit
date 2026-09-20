@@ -307,3 +307,101 @@ def test_diff_json_output_shape(tmp_path: Path) -> None:
     data = json.loads(result.stdout)
     assert data["kind"] == "spec"
     assert data["diffs"] == []
+
+
+# ── Exportación: --png-mode / --texturepacker / --mipmaps ────────────────
+def test_generate_png_mode_png8(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.json"
+    _write_spec(spec)
+    out = tmp_path / "out"
+    result = runner.invoke(app, ["generate", str(spec), "--out", str(out), "--png-mode", "png8"])
+    assert result.exit_code == 0, result.output
+    with Image.open(out / "atlas.png") as img:
+        assert img.mode == "P"
+
+
+def test_generate_png_mode_png24(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.json"
+    _write_spec(spec)
+    out = tmp_path / "out"
+    result = runner.invoke(app, ["generate", str(spec), "--out", str(out), "--png-mode", "png24"])
+    assert result.exit_code == 0, result.output
+    with Image.open(out / "atlas.png") as img:
+        assert img.mode == "RGB"
+
+
+def test_generate_invalid_png_mode_exits_1(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.json"
+    _write_spec(spec)
+    result = runner.invoke(app, ["generate", str(spec), "--png-mode", "webp"])
+    assert result.exit_code == 1
+
+
+def test_generate_texturepacker_writes_tpsheet(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.json"
+    _write_spec(spec)
+    out = tmp_path / "out"
+    result = runner.invoke(app, ["generate", str(spec), "--out", str(out), "--texturepacker"])
+    assert result.exit_code == 0, result.output
+    tp = json.loads((out / "diff_atlas.tpsheet.json").read_text())
+    assert set(tp["frames"]) == {"rock_00.png", "rock_01.png"}
+    assert tp["meta"]["format"] == "RGBA8888"
+
+
+def test_generate_mipmaps_writes_levels(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.json"
+    _write_spec(spec)
+    out = tmp_path / "out"
+    result = runner.invoke(app, ["generate", str(spec), "--out", str(out), "--mipmaps"])
+    assert result.exit_code == 0, result.output
+    m = json.loads((out / "manifest.json").read_text())
+    levels = m["mipmaps"]["levels"]
+    assert len(levels) == 3
+    for lvl in levels:
+        assert (out / lvl["file"]).is_file()
+
+
+def test_generate_mipmaps_custom_level_count(tmp_path: Path) -> None:
+    spec = tmp_path / "spec.json"
+    _write_spec(spec)
+    out = tmp_path / "out"
+    result = runner.invoke(
+        app, ["generate", str(spec), "--out", str(out), "--mipmaps", "--mipmap-levels", "1"]
+    )
+    assert result.exit_code == 0, result.output
+    m = json.loads((out / "manifest.json").read_text())
+    assert len(m["mipmaps"]["levels"]) == 1
+
+
+def test_skip_existing_still_generates_missing_texturepacker(tmp_path: Path) -> None:
+    """`skip_existing` no debe impedir que se emita un artefacto opcional
+    que todavía no existía en una corrida anterior."""
+    spec = tmp_path / "spec.json"
+    _write_spec(spec)
+    out = tmp_path / "out"
+    _generate(spec, out, None, False)  # primera corrida sin --texturepacker
+    tp_path = out / "diff_atlas.tpsheet.json"
+    assert not tp_path.is_file()
+
+    result = runner.invoke(
+        app, ["generate", str(spec), "--out", str(out), "--skip-existing", "--texturepacker"]
+    )
+    assert result.exit_code == 0, result.output
+    assert tp_path.is_file()
+
+
+def test_skip_existing_works_with_non_default_png_mode(tmp_path: Path) -> None:
+    """El probe de CRC usado por `skip_existing` debe respetar `--png-mode`,
+    si no la detección de "sin cambios" queda rota para png8/png24."""
+    spec = tmp_path / "spec.json"
+    _write_spec(spec)
+    out = tmp_path / "out"
+    r1 = runner.invoke(
+        app, ["generate", str(spec), "--out", str(out), "--png-mode", "png8", "--skip-existing"]
+    )
+    assert r1.exit_code == 0, r1.output
+    r2 = runner.invoke(
+        app, ["generate", str(spec), "--out", str(out), "--png-mode", "png8", "--skip-existing"]
+    )
+    assert r2.exit_code == 0, r2.output
+    assert "skip" in r2.stdout

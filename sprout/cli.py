@@ -2,6 +2,7 @@
 
 Uso:
   sprout generate specs/demo.json --out ../demo/assets/procgen
+  sprout generate specs/demo.json --png-mode png8 --texturepacker --mipmaps
   sprout batch specs/ --out ../demo/assets/procgen
   sprout watch specs/ --out ../demo/assets/procgen
   sprout info specs/demo.json [--json]
@@ -21,16 +22,22 @@ import typer
 
 from . import __version__
 from .exporter import (
+    apply_png_mode,
     build_autotile_map,
     build_font_map,
     build_manifest,
     build_shader,
     build_sheet,
+    build_texturepacker,
+    compute_mipmap_meta,
     emit_index_ts,
     render_items,
     shader_filename,
+    texturepacker_filename,
     write_manifest,
+    write_mipmap_files,
     write_png,
+    write_texturepacker,
 )
 from .generators.base import FrameData
 from .spec import Spec, SpecError, load_spec
@@ -39,8 +46,13 @@ app = typer.Typer(add_completion=False, no_args_is_help=True,
                   help="sprout — assets 2D procedurales deterministas para Expo + react-native-skia.")
 
 
+PNG_MODES = ("rgba", "png8", "png24")
+
+
 def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
-              skip_existing: bool) -> dict:
+              skip_existing: bool, png_mode: str = "rgba",
+              texturepacker: bool = False, mipmaps: bool = False,
+              mip_levels: int = 3) -> dict:
     spec = load_spec(spec_path)
     if seed is not None:
         spec.seed = seed
@@ -52,21 +64,29 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
     atlas_path = out / atlas_name
     manifest_path = out / "manifest.json"
     index_path = out / "index.ts"
+    tp_path = out / texturepacker_filename(spec) if texturepacker else None
 
     autotile_map = build_autotile_map(spec, frames)
     font_map = build_font_map(spec, frames)
     shader_source, shader_block = build_shader(spec)
     shader_path = out / shader_filename(spec) if shader_block else None
+    mip_meta = compute_mipmap_meta(sheet, spec, mip_levels) if mipmaps else []
     manifest = build_manifest(spec, records, atlas_name, sheet, str(spec_path),
-                              autotile_map, shader_block, font_map)
+                              autotile_map, shader_block, font_map,
+                              {"levels": mip_meta} if mip_meta else None)
 
     if skip_existing and atlas_path.is_file() and manifest_path.is_file() and index_path.is_file():
-        if shader_block and not (shader_path and shader_path.is_file()):
-            pass  # falta el .sksl -> regenerar
+        missing_extra = (
+            (shader_block and not (shader_path and shader_path.is_file()))
+            or (texturepacker and not tp_path.is_file())
+            or (mipmaps and not all((out / lvl["file"]).is_file() for lvl in mip_meta))
+        )
+        if missing_extra:
+            pass  # falta un artefacto opcional -> regenerar
         else:
             current = zlib.crc32(atlas_path.read_bytes()) & 0xFFFFFFFF
             probe = io.BytesIO()
-            sheet.save(probe, format="PNG")
+            apply_png_mode(sheet, png_mode).save(probe, format="PNG")
             fresh = zlib.crc32(probe.getvalue()) & 0xFFFFFFFF
             same_manifest = manifest_path.read_bytes() == (
                 json.dumps(manifest, indent=2) + "\n"
@@ -80,12 +100,17 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
                 return {"spec": spec, "out": out, "atlas": atlas_path, "crc": current,
                         "skipped": True}
 
-    crc = write_png(sheet, atlas_path)
+    crc = write_png(sheet, atlas_path, png_mode)
     write_manifest(manifest, manifest_path)
     if shader_source is not None and shader_path is not None:
         shader_path.parent.mkdir(parents=True, exist_ok=True)
         shader_path.write_text(shader_source)
     emit_index_ts(manifest, index_path)
+    if texturepacker:
+        tp = build_texturepacker(spec, records, atlas_name, sheet, png_mode)
+        write_texturepacker(tp, tp_path)
+    if mipmaps:
+        write_mipmap_files(sheet, out, png_mode, mip_meta)
     return {"spec": spec, "out": out, "atlas": atlas_path, "crc": crc, "skipped": False}
 
 
@@ -95,10 +120,18 @@ def generate(
     out: Path = typer.Option(None, "--out", "-o", help="directorio de salida (default: junto a la spec)"),
     seed: int = typer.Option(None, "--seed", "-s", help=f"sobreescribe el seed de la spec"),
     skip_existing: bool = typer.Option(False, "--skip-existing", help="no reescribe si el atlas ya existe con el mismo crc"),
+    png_mode: str = typer.Option("rgba", "--png-mode", help="formato del atlas: rgba | png8 | png24"),
+    texturepacker: bool = typer.Option(False, "--texturepacker", help="emite además <name>.tpsheet.json (formato TexturePacker JSON Hash)"),
+    mipmaps: bool = typer.Option(False, "--mipmaps", help="genera una cadena de mip levels del atlas (@0.5x, @0.25x, ...)"),
+    mipmap_levels: int = typer.Option(3, "--mipmap-levels", help="cantidad máxima de niveles de mip (con --mipmaps)"),
 ) -> None:
     """Genera spritesheet + manifest.json + index.ts desde una spec."""
+    if png_mode not in PNG_MODES:
+        typer.secho(f"--png-mode inválido '{png_mode}' (disponibles: {', '.join(PNG_MODES)})",
+                    fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
     try:
-        r = _generate(spec, out, seed, skip_existing)
+        r = _generate(spec, out, seed, skip_existing, png_mode, texturepacker, mipmaps, mipmap_levels)
     except SpecError as e:
         typer.secho(f"error en {spec}: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
@@ -121,8 +154,16 @@ def batch(
     specs_dir: Path = typer.Argument(..., help="directorio (o glob) con specs"),
     out: Path = typer.Option(None, "--out", "-o", help="directorio de salida común"),
     skip_existing: bool = typer.Option(False, "--skip-existing", help="no reescribe atlases sin cambios"),
+    png_mode: str = typer.Option("rgba", "--png-mode", help="formato del atlas: rgba | png8 | png24"),
+    texturepacker: bool = typer.Option(False, "--texturepacker", help="emite además <name>.tpsheet.json (formato TexturePacker JSON Hash)"),
+    mipmaps: bool = typer.Option(False, "--mipmaps", help="genera una cadena de mip levels del atlas (@0.5x, @0.25x, ...)"),
+    mipmap_levels: int = typer.Option(3, "--mipmap-levels", help="cantidad máxima de niveles de mip (con --mipmaps)"),
 ) -> None:
     """Genera todas las specs de un directorio (patrón *.json)."""
+    if png_mode not in PNG_MODES:
+        typer.secho(f"--png-mode inválido '{png_mode}' (disponibles: {', '.join(PNG_MODES)})",
+                    fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
     files = sorted(specs_dir.glob("*.json"))
     if not files:
         typer.secho(f"no hay specs (*.json) en {specs_dir}", fg=typer.colors.RED, err=True)
@@ -130,7 +171,7 @@ def batch(
     failed = 0
     for f in files:
         try:
-            _generate(f, out, None, skip_existing)
+            _generate(f, out, None, skip_existing, png_mode, texturepacker, mipmaps, mipmap_levels)
         except SpecError as e:
             typer.secho(f"error en {f}: {e}", fg=typer.colors.RED, err=True)
             failed += 1

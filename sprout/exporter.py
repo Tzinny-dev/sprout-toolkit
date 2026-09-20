@@ -109,7 +109,8 @@ def build_font_map(spec: Spec, items_frames: list[list[FrameData]]) -> dict:
 
 def build_manifest(spec: Spec, records: list[dict], atlas_name: str,
                    sheet: Image.Image, spec_path: str, autotile_map: dict | None = None,
-                   shader_block: dict | None = None, font_map: dict | None = None) -> dict:
+                   shader_block: dict | None = None, font_map: dict | None = None,
+                   mipmaps_block: dict | None = None) -> dict:
     anim: dict[str, dict] = {}
     for name, a in spec.animations.items():
         item = next(it for it in spec.items if it.id == a.frames)
@@ -147,13 +148,98 @@ def build_manifest(spec: Spec, records: list[dict], atlas_name: str,
         **({"autotile": autotile_map} if autotile_map else {}),
         **({"shader": shader_block} if shader_block else {}),
         **({"font": font_map} if font_map else {}),
+        **({"mipmaps": mipmaps_block} if mipmaps_block else {}),
     }
 
 
-def write_png(sheet: Image.Image, path: Path) -> int:
+def apply_png_mode(img: Image.Image, png_mode: str) -> Image.Image:
+    """Convierte el atlas al modo de export elegido antes de guardar.
+
+    "png24" descarta el canal alpha (solo apto para atlases sin
+    transparencia real, p. ej. `terrain`). "png8" cuantiza a paleta indexada
+    de 256 colores — PIL conserva el alpha exacto por entrada de paleta, así
+    que la transparencia sobrevive (verificado con píxeles opacos,
+    semitransparentes y vacíos)."""
+    if png_mode == "png24":
+        return img.convert("RGB")
+    if png_mode == "png8":
+        return img.quantize(colors=256)
+    return img  # "rgba" (default): sin cambios
+
+
+def write_png(sheet: Image.Image, path: Path, png_mode: str = "rgba") -> int:
     path.parent.mkdir(parents=True, exist_ok=True)
-    sheet.save(path)
+    apply_png_mode(sheet, png_mode).save(path)
     return zlib.crc32(path.read_bytes()) & 0xFFFFFFFF
+
+
+_TP_FORMAT = {"rgba": "RGBA8888", "png24": "RGB888", "png8": "I8"}
+
+
+def texturepacker_filename(spec: Spec) -> str:
+    return f"{spec.name}.tpsheet.json"
+
+
+def build_texturepacker(spec: Spec, records: list[dict], atlas_name: str,
+                        sheet: Image.Image, png_mode: str) -> dict:
+    """Formato "JSON (Hash)" de TexturePacker — compatible con Phaser/PixiJS/
+    etc. No reemplaza `manifest.json`, se emite junto a él (opt-in)."""
+    frames = {
+        f"{r['id']}.png": {
+            "frame": {"x": r["x"], "y": r["y"], "w": r["w"], "h": r["h"]},
+            "rotated": False,
+            "trimmed": False,
+            "spriteSourceSize": {"x": 0, "y": 0, "w": r["w"], "h": r["h"]},
+            "sourceSize": {"w": r["w"], "h": r["h"]},
+        }
+        for r in records
+    }
+    return {
+        "frames": frames,
+        "meta": {
+            "app": "sprout",
+            "version": __version__,
+            "image": atlas_name,
+            "format": _TP_FORMAT[png_mode],
+            "size": {"w": sheet.width, "h": sheet.height},
+            "scale": "1",
+        },
+    }
+
+
+def write_texturepacker(tp: dict, path: Path) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(tp, indent=2) + "\n")
+
+
+def compute_mipmap_meta(sheet: Image.Image, spec: Spec, levels: int) -> list[dict]:
+    """Metadata pura de los niveles de mip (scale/file/w/h), sin tocar disco:
+    se necesita antes del check de `skip_existing` y para el bloque
+    `mipmaps` del manifest. Se detiene si una dimensión bajaría de 4px."""
+    base = Path(spec.filename)
+    out: list[dict] = []
+    scale = 1.0
+    for _ in range(levels):
+        scale /= 2
+        w, h = round(sheet.width * scale), round(sheet.height * scale)
+        if w < 4 or h < 4:
+            break
+        out.append({
+            "scale": scale,
+            "file": f"{base.stem}@{scale:g}x{base.suffix}",
+            "w": w, "h": h,
+        })
+    return out
+
+
+def write_mipmap_files(sheet: Image.Image, out_dir: Path, png_mode: str,
+                       meta: list[dict]) -> None:
+    """Escribe cada nivel de mip: `Image.BOX` (filtro de promedio de área,
+    correcto para mip generation — evita el ringing de Lanczos)."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for lvl in meta:
+        img = sheet.resize((lvl["w"], lvl["h"]), Image.BOX)
+        apply_png_mode(img, png_mode).save(out_dir / lvl["file"])
 
 
 def write_manifest(manifest: dict, path: Path) -> None:
@@ -282,6 +368,17 @@ export interface FontBlock {{
   items: Record<string, FontItem>;
 }}
 
+export interface MipmapLevel {{
+  scale: number;
+  file: string;
+  w: number;
+  h: number;
+}}
+
+export interface MipmapsBlock {{
+  levels: MipmapLevel[];
+}}
+
 export interface Manifest {{
   schema: string;
   name: string;
@@ -295,6 +392,7 @@ export interface Manifest {{
   autotile?: Autotile;
   shader?: ShaderBlock;
   font?: FontBlock;
+  mipmaps?: MipmapsBlock;
   meta: unknown;
 }}
 
