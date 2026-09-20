@@ -1,0 +1,15 @@
+{
+  "name": "ui_atlas",
+  "seed": 4242,
+  "target": "expo-rn-skia",
+  "files": { "atlas": "atlas.png" },
+  "layout": { "framePx": 64, "cols": 6, "tileLogical": 32, "sample": "nearest" },
+  "items": [
+    { "id": "btn",    "generator": "ui", "frames": 3, "params": { "kind": "button" } },
+    { "id": "slider", "generator": "ui", "frames": 6, "params": { "kind": "slider" } },
+    { "id": "panel",  "generator": "ui", "frames": 9, "params": { "kind": "panel" } }
+  ],
+  "animations": {
+    "btn_states": { "frames": "btn", "fps": 4, "loop": false }
+  }
+}

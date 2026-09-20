@@ -13,12 +13,14 @@ from .blob_walk import BlobWalk
 from .particles import Particles
 from .props import Props
 from .terrain import Terrain
+from .ui import Ui
 
 GENERATORS: dict[str, type[Generator]] = {
     Terrain.id: Terrain,
     Props.id: Props,
     Particles.id: Particles,
     BlobWalk.id: BlobWalk,
+    Ui.id: Ui,
 }
 
 

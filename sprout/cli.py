@@ -5,6 +5,7 @@ Uso:
   sprout batch specs/ --out ../demo/assets/procgen
   sprout watch specs/ --out ../demo/assets/procgen
   sprout info specs/demo.json [--json]
+  sprout lint specs/demo.json [--json]
   sprout validate specs/demo.json
 """
 from __future__ import annotations
@@ -29,6 +30,7 @@ from .exporter import (
     write_manifest,
     write_png,
 )
+from .generators.base import FrameData
 from .spec import Spec, SpecError, load_spec
 
 app = typer.Typer(add_completion=False, no_args_is_help=True,
@@ -213,6 +215,65 @@ def info(
         typer.echo("  anim:")
         for name, a in s.animations.items():
             typer.echo(f"    - {name:<14} frames={a.frames} fps={a.fps} loop={a.loop}")
+
+
+PADDING_WARN_RATIO = 0.25
+
+
+def _lint_warnings(spec: Spec, items_frames: list[list[FrameData]]) -> list[dict]:
+    """Advertencias de calidad de una spec ya renderizada: padding de atlas
+    (celdas de grilla sin usar) y frames completamente transparentes."""
+    warnings: list[dict] = []
+
+    cols = spec.layout.cols
+    rows = spec.layout.resolve_rows(spec.total_frames)
+    capacity = cols * rows
+    unused = capacity - spec.total_frames
+    if capacity and unused / capacity > PADDING_WARN_RATIO:
+        warnings.append({
+            "check": "padding",
+            "message": f"{unused}/{capacity} celdas del atlas sin usar ({unused / capacity:.0%})",
+        })
+
+    empty_ids = [
+        fr.id for frames in items_frames for fr in frames
+        # los tiles RGB (p. ej. terrain sin autotile) son opacos por diseño
+        # y no tienen canal alpha que consultar.
+        if fr.image.mode == "RGBA" and fr.image.getchannel("A").getbbox() is None
+    ]
+    if empty_ids:
+        warnings.append({
+            "check": "empty_frames",
+            "message": f"{len(empty_ids)} frame(s) completamente transparentes",
+            "ids": empty_ids,
+        })
+
+    return warnings
+
+
+@app.command()
+def lint(
+    spec: Path = typer.Argument(..., help="spec.json a analizar"),
+    as_json: bool = typer.Option(False, "--json", help="salida machine-readable"),
+) -> None:
+    """Analiza una spec: padding de atlas y frames vacíos (renderiza para verificar)."""
+    try:
+        s = load_spec(spec)
+        items_frames = render_items(s)
+    except SpecError as e:
+        typer.secho(f"inválida: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+    warnings = _lint_warnings(s, items_frames)
+    if as_json:
+        typer.echo(json.dumps({"spec": str(spec), "warnings": warnings}, indent=2))
+    elif not warnings:
+        typer.secho(f"[{s.name}] OK — sin advertencias", fg=typer.colors.GREEN)
+    else:
+        typer.secho(f"[{s.name}] {len(warnings)} advertencia(s):", fg=typer.colors.YELLOW)
+        for w in warnings:
+            typer.echo(f"  - [{w['check']}] {w['message']}")
+    raise typer.Exit(1 if warnings else 0)
 
 
 @app.command()

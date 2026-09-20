@@ -9,9 +9,12 @@ import zlib
 from pathlib import Path
 from typing import Callable
 
+from PIL import Image
 from typer.testing import CliRunner
 
-from sprout.cli import app
+from sprout.cli import app, _lint_warnings
+from sprout.generators.base import FrameData
+from sprout.spec import load_spec
 
 SPECS = Path(__file__).resolve().parents[1] / "specs"
 runner = CliRunner()
@@ -35,7 +38,7 @@ def _wait(pred: Callable[[], bool], timeout: float, what: str) -> None:
 
 
 def test_commands_registered() -> None:
-    assert {"generate", "batch", "validate", "watch", "info"} <= _commands()
+    assert {"generate", "batch", "validate", "watch", "info", "lint"} <= _commands()
 
 
 def test_watch_regenerates_on_spec_change(tmp_path: Path) -> None:
@@ -134,3 +137,72 @@ def test_info_invalid_spec_exits_1(tmp_path: Path) -> None:
 def test_info_missing_file_exits_1(tmp_path: Path) -> None:
     result = runner.invoke(app, ["info", str(tmp_path / "nope.json")])
     assert result.exit_code == 1
+
+
+# ── Comando `lint` ───────────────────────────────────────────────────────
+def test_lint_clean_spec_exits_zero() -> None:
+    result = runner.invoke(app, ["lint", str(SPECS / "ui.json")])
+    assert result.exit_code == 0, result.output
+    assert "OK" in result.stdout
+
+
+def test_lint_json_output() -> None:
+    result = runner.invoke(app, ["lint", "--json", str(SPECS / "ui.json")])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.stdout)
+    assert data["warnings"] == []
+
+
+def test_lint_detects_padding(tmp_path: Path) -> None:
+    spec = tmp_path / "padded.json"
+    spec.write_text(json.dumps({
+        "name": "padded_atlas",
+        "seed": 1,
+        "layout": {"framePx": 32, "cols": 10, "tileLogical": 16},
+        "items": [
+            {"id": "spark", "generator": "particles", "frames": 2,
+             "params": {"kind": "spark", "particles": 4}},
+        ],
+    }))
+    result = runner.invoke(app, ["lint", "--json", str(spec)])
+    assert result.exit_code == 1, result.output
+    data = json.loads(result.stdout)
+    checks = {w["check"] for w in data["warnings"]}
+    assert "padding" in checks
+
+
+def test_lint_invalid_spec_exits_1(tmp_path: Path) -> None:
+    bad = tmp_path / "bad.json"
+    bad.write_text('{"name": "x"}')  # falta seed/items
+    result = runner.invoke(app, ["lint", str(bad)])
+    assert result.exit_code == 1
+
+
+def test_lint_warnings_flags_empty_frames() -> None:
+    """Unitario: `_lint_warnings` detecta frames totalmente transparentes
+    sin depender de que algún generador real produzca uno vacío."""
+    spec = load_spec(SPECS / "ui.json")
+    empty = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    items_frames = [[FrameData(id="ghost_00", image=empty)]]
+    warnings = _lint_warnings(spec, items_frames)
+    empty_warning = next(w for w in warnings if w["check"] == "empty_frames")
+    assert empty_warning["ids"] == ["ghost_00"]
+
+
+def test_lint_ignores_rgb_frames_without_alpha() -> None:
+    """Los tiles RGB (terrain sin autotile) no tienen canal alpha: no deben
+    dispararse como falso positivo de `empty_frames`."""
+    spec = load_spec(SPECS / "ui.json")
+    rgb_frame = Image.new("RGB", (64, 64), (10, 10, 10))
+    items_frames = [[FrameData(id="tile_00", image=rgb_frame)]]
+    warnings = _lint_warnings(spec, items_frames)
+    assert not any(w["check"] == "empty_frames" for w in warnings)
+
+
+def test_lint_terrain_spec_no_false_positive() -> None:
+    """`demo.json` mezcla frames RGBA (hero) y RGB (tiles): no debe fallar
+    ni marcar falsos positivos de frames vacíos."""
+    result = runner.invoke(app, ["lint", "--json", str(SPECS / "demo.json")])
+    assert result.exit_code == 0, result.output
+    data = json.loads(result.stdout)
+    assert not any(w["check"] == "empty_frames" for w in data["warnings"])
