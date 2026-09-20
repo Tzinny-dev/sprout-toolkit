@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-20
+
+Pip-first onboarding: from `pip install` to sprites on screen in ~10 minutes,
+with no git clone required.
+
 ### Added
 
 - `sprout init --out ./assets/starter`: writes a starter spec and generates
@@ -62,6 +67,7 @@ plus the full growth-plan cycle:
   TexturePacker JSON, atlas mipmaps.
 - 142 tests (`pytest tests/ -q`).
 
-[Unreleased]: https://github.com/Tzinny-dev/sprout-toolkit/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/Tzinny-dev/sprout-toolkit/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Tzinny-dev/sprout-toolkit/releases/tag/v0.2.0
 [0.1.1]: https://github.com/Tzinny-dev/sprout-toolkit/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Tzinny-dev/sprout-toolkit/releases/tag/v0.1.0
