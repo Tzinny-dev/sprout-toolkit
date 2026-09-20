@@ -4,6 +4,7 @@ Uso:
   sprout generate specs/demo.json --out ../demo/assets/procgen
   sprout batch specs/ --out ../demo/assets/procgen
   sprout watch specs/ --out ../demo/assets/procgen
+  sprout info specs/demo.json [--json]
   sprout validate specs/demo.json
 """
 from __future__ import annotations
@@ -146,6 +147,72 @@ def validate(spec: Path = typer.Argument(..., help="spec.json a validar")) -> No
         f"frames={s.total_frames} seed={s.seed}",
         fg=typer.colors.GREEN,
     )
+
+
+@app.command()
+def info(
+    spec: Path = typer.Argument(..., help="spec.json a inspeccionar"),
+    as_json: bool = typer.Option(False, "--json", help="salida machine-readable"),
+) -> None:
+    """Reporte de una spec: items, frames, layout y tamaño estimado del atlas."""
+    try:
+        s = load_spec(spec)
+    except SpecError as e:
+        typer.secho(f"inválida: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+    cols = s.layout.cols
+    rows = s.layout.resolve_rows(s.total_frames)
+    fpx = s.layout.frame_px
+    atlas_w, atlas_h = cols * fpx, rows * fpx
+
+    if as_json:
+        typer.echo(json.dumps({
+            "name": s.name,
+            "seed": s.seed,
+            "target": s.target,
+            "spec": str(spec),
+            "layout": {
+                "framePx": fpx, "cols": cols, "rows": rows,
+                "tileLogical": s.layout.tile_logical, "sample": s.layout.sample,
+            },
+            "atlas": {
+                "file": s.filename, "width": atlas_w, "height": atlas_h,
+                "frames": s.total_frames,
+            },
+            "items": [
+                {"id": it.id, "generator": it.generator, "frames": it.frames,
+                 "autotile": it.autotile, "params": it.params}
+                for it in s.items
+            ],
+            "animations": {
+                n: {"frames": a.frames, "fps": a.fps, "loop": a.loop}
+                for n, a in s.animations.items()
+            },
+            "runtime": bool(s.runtime),
+        }, indent=2))
+        return
+
+    typer.secho(f"[{s.name}] {spec}", fg=typer.colors.GREEN, bold=True)
+    typer.echo(f"  seed    : {s.seed}")
+    typer.echo(f"  target  : {s.target}")
+    typer.echo(f"  layout  : framePx={fpx} cols={cols} rows={rows} "
+               f"tileLogical={s.layout.tile_logical} sample={s.layout.sample}")
+    typer.echo(f"  atlas   : {s.filename} {atlas_w}x{atlas_h} ({s.total_frames} frames)")
+    typer.echo(f"  runtime : {'sí' if s.runtime else 'no'}")
+    typer.echo("  items:")
+    for it in s.items:
+        extra = ""
+        if it.autotile:
+            extra += f" autotile={it.autotile}"
+        keys = sorted(k for k in it.params if k != "autotile")
+        if keys:
+            extra += f" params[{','.join(keys)}]"
+        typer.echo(f"    - {it.id:<14} {it.generator:<10} frames={it.frames}{extra}")
+    if s.animations:
+        typer.echo("  anim:")
+        for name, a in s.animations.items():
+            typer.echo(f"    - {name:<14} frames={a.frames} fps={a.fps} loop={a.loop}")
 
 
 @app.command()

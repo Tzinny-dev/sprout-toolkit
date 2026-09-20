@@ -1,0 +1,16 @@
+{
+  "name": "particles_atlas",
+  "seed": 31337,
+  "target": "expo-rn-skia",
+  "files": { "atlas": "atlas.png" },
+  "layout": { "framePx": 64, "cols": 8, "tileLogical": 32, "sample": "nearest" },
+  "items": [
+    { "id": "spark",  "generator": "particles", "frames": 8, "params": { "kind": "spark",  "particles": 16 } },
+    { "id": "smoke",  "generator": "particles", "frames": 8, "params": { "kind": "smoke",  "particles": 12 } },
+    { "id": "dust",   "generator": "particles", "frames": 8, "params": { "kind": "dust",   "particles": 14 } },
+    { "id": "bubble", "generator": "particles", "frames": 8, "params": { "kind": "bubble", "particles": 10 } }
+  ],
+  "animations": {
+    "burst_spark": { "frames": "spark", "fps": 16, "loop": false }
+  }
+}
