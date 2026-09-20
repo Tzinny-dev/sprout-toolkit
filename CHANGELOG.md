@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-09-20
+
+### Fixed
+
+- Atomic artifact writes (`temp file + os.replace`): readers — `sprout watch`
+  consumers, Metro, file pollers — never observe half-written `atlas.png` /
+  `manifest.json` / `index.ts`. Found via a CI flake where a test read the
+  atlas mid-write (CRC 0).
+
+### Changed
+
+- README branding: `SPROUT` → `SPROUT TOOLKIT`.
+
 ## [0.2.0] — 2026-09-20
 
 Pip-first onboarding: from `pip install` to sprites on screen in ~10 minutes,
@@ -67,7 +80,8 @@ plus the full growth-plan cycle:
   TexturePacker JSON, atlas mipmaps.
 - 142 tests (`pytest tests/ -q`).
 
-[Unreleased]: https://github.com/Tzinny-dev/sprout-toolkit/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/Tzinny-dev/sprout-toolkit/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/Tzinny-dev/sprout-toolkit/releases/tag/v0.2.1
 [0.2.0]: https://github.com/Tzinny-dev/sprout-toolkit/releases/tag/v0.2.0
 [0.1.1]: https://github.com/Tzinny-dev/sprout-toolkit/releases/tag/v0.1.1
 [0.1.0]: https://github.com/Tzinny-dev/sprout-toolkit/releases/tag/v0.1.0
