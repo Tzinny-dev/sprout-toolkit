@@ -10,10 +10,12 @@ from __future__ import annotations
 
 from .base import FrameData, Generator
 from .blob_walk import BlobWalk
+from .props import Props
 from .terrain import Terrain
 
 GENERATORS: dict[str, type[Generator]] = {
     Terrain.id: Terrain,
+    Props.id: Props,
     BlobWalk.id: BlobWalk,
 }
 

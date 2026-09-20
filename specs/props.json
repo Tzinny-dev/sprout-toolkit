@@ -1,0 +1,14 @@
+{
+  "name": "props_atlas",
+  "seed": 2024,
+  "target": "expo-rn-skia",
+  "files": { "atlas": "atlas.png" },
+  "layout": { "framePx": 64, "cols": 6, "tileLogical": 32, "sample": "nearest" },
+  "items": [
+    { "id": "rock",     "generator": "props", "frames": 6, "params": { "kind": "rock" } },
+    { "id": "bush",     "generator": "props", "frames": 6, "params": { "kind": "bush" } },
+    { "id": "chest",    "generator": "props", "frames": 4, "params": { "kind": "chest" } },
+    { "id": "mushroom", "generator": "props", "frames": 4, "params": { "kind": "mushroom" } },
+    { "id": "flower",   "generator": "props", "frames": 6, "params": { "kind": "flower" } }
+  ]
+}

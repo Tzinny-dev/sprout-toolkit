@@ -3,12 +3,14 @@
 Uso:
   sprout generate specs/demo.json --out ../demo/assets/procgen
   sprout batch specs/ --out ../demo/assets/procgen
+  sprout watch specs/ --out ../demo/assets/procgen
   sprout validate specs/demo.json
 """
 from __future__ import annotations
 
 import io
 import json
+import time
 import zlib
 from pathlib import Path
 
@@ -144,6 +146,61 @@ def validate(spec: Path = typer.Argument(..., help="spec.json a validar")) -> No
         f"frames={s.total_frames} seed={s.seed}",
         fg=typer.colors.GREEN,
     )
+
+
+@app.command()
+def watch(
+    specs_dir: Path = typer.Argument(..., help="directorio con specs (*.json)"),
+    out: Path = typer.Option(None, "--out", "-o", help="directorio de salida (default: junto a cada spec)"),
+    interval: float = typer.Option(1.0, "--interval", "-i", help="sondaje de cambios en segundos"),
+) -> None:
+    """Vigila specs/ y regenera assets cuando cambian (Ctrl-C para detener)."""
+    if not specs_dir.is_dir():
+        typer.secho(f"no existe el directorio: {specs_dir}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    files = sorted(specs_dir.glob("*.json"))
+    if not files:
+        typer.secho(f"no hay specs (*.json) en {specs_dir}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+    typer.secho(
+        f"[watch] {specs_dir} -> {out or specs_dir} cada {interval}s "
+        f"({len(files)} specs) — Ctrl-C para salir",
+        fg=typer.colors.CYAN,
+    )
+    mtimes: dict[Path, float] = {}
+    primera = True
+    try:
+        while True:
+            for f in sorted(specs_dir.glob("*.json")):
+                try:
+                    mt = f.stat().st_mtime
+                except OSError:
+                    continue
+                if mtimes.get(f, 0.0) >= mt:
+                    continue
+                mtimes[f] = mt
+                if not primera:
+                    typer.secho(f"  [cambio] {f.name}", fg=typer.colors.BLUE)
+                try:
+                    r = _generate(f, out, None, True)
+                except SpecError as e:
+                    typer.secho(f"  [error] {f.name}: {e}", fg=typer.colors.RED, err=True)
+                    continue
+                s: Spec = r["spec"]
+                if r["skipped"]:
+                    typer.secho(f"  [skip]  {s.name} sin cambios (crc {r['crc']:08x})",
+                                fg=typer.colors.YELLOW)
+                else:
+                    typer.secho(
+                        f"  [ok]    {s.name} seed={s.seed} frames={s.total_frames} "
+                        f"-> {r['out'].resolve()} (crc {r['crc']:08x})",
+                        fg=typer.colors.GREEN,
+                    )
+            primera = False
+            time.sleep(interval)
+    except KeyboardInterrupt:
+        typer.secho("\n[watch] detenido.", fg=typer.colors.CYAN)
 
 
 @app.callback(invoke_without_command=True)
