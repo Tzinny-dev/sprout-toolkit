@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `sprout init --out ./assets/starter`: writes a starter spec and generates
+  its atlas in one step (pip-first onboarding, no git clone needed). Reruns
+  never overwrite an edited `starter.json` (`--no-generate` to skip the
+  build).
+- `specs/starter.json`: 8 walk frames + 4 prop frames (seed 7), backing the
+  new 10-minute tutorial.
+- `docs/starter-tutorial.md`: from `pip install` to sprites on screen in a
+  fresh Expo app (SDK 57 + Skia 2.6.2), verified end-to-end (`tsc` clean +
+  `expo export` bundles the generated atlas via Metro).
+
 ## [0.1.1] — 2026-09-20
 
 First public release on PyPI (`sprout-toolkit`; install with

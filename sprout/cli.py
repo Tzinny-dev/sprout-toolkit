@@ -9,6 +9,7 @@ Usage:
   sprout lint specs/demo.json [--json]
   sprout diff <a> <b> [--json]
   sprout validate specs/demo.json
+  sprout init --out ./assets/starter   # copy the starter spec + tutorial
 """
 from __future__ import annotations
 
@@ -112,6 +113,49 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
     if mipmaps:
         write_mipmap_files(sheet, out, png_mode, mip_meta)
     return {"spec": spec, "out": out, "atlas": atlas_path, "crc": crc, "skipped": False}
+
+
+STARTER_SPEC = """{
+  "name": "starter_atlas",
+  "seed": 7,
+  "target": "expo-rn-skia",
+  "files": { "atlas": "atlas.png" },
+  "layout": { "framePx": 64, "cols": 4, "tileLogical": 32, "sample": "nearest" },
+  "items": [
+    { "id": "hero", "generator": "blob_walk", "frames": 8 },
+    { "id": "coin", "generator": "props", "frames": 4, "params": { "kind": "flower" } }
+  ],
+  "animations": { "walk": { "frames": "hero", "fps": 8, "loop": true } }
+}
+"""
+
+
+@app.command()
+def init(
+    out: Path = typer.Option(Path("./assets/starter"), "--out", "-o",
+                             help="directory for the starter spec + generated assets"),
+    generate_now: bool = typer.Option(True, "--generate/--no-generate",
+                                      help="run generate right after writing the spec"),
+) -> None:
+    """Write a starter spec and generate its atlas (pip-first onboarding)."""
+    out.mkdir(parents=True, exist_ok=True)
+    spec_path = out / "starter.json"
+    if not spec_path.is_file():
+        spec_path.write_text(STARTER_SPEC)
+        typer.secho(f"wrote {spec_path.resolve()}", fg=typer.colors.GREEN)
+    else:
+        typer.secho(f"keep existing {spec_path.resolve()}", fg=typer.colors.YELLOW)
+    if generate_now:
+        r = _generate(spec_path, out, None, False, "rgba", False, False, 3)
+        s: Spec = r["spec"]
+        typer.secho(
+            f"[{s.name}] seed={s.seed} frames={s.total_frames} "
+            f"sheet={s.layout.cols}x{s.layout.resolve_rows(s.total_frames)} grid"
+            f" -> {r['out'].resolve()}",
+            fg=typer.colors.GREEN,
+        )
+        typer.secho(f"  atlas.png crc=0x{r['crc']:08x}", fg=typer.colors.BRIGHT_BLACK)
+    typer.echo("next: see docs/starter-tutorial.md (10-minute Expo walkthrough)")
 
 
 @app.command()

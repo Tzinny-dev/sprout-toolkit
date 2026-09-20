@@ -105,6 +105,10 @@ The installed command is `sprout` (not `sprout-toolkit` — that's just the PyPI
 ### Generate assets
 
 ```bash
+# New here? 10-minute walkthrough: docs/starter-tutorial.md
+# Fastest start: writes starter.json + generates its atlas
+sprout init --out ./assets/starter
+
 # Generate every asset defined under specs/
 sprout batch specs/ --out ./out
 

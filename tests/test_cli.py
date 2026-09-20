@@ -38,7 +38,35 @@ def _wait(pred: Callable[[], bool], timeout: float, what: str) -> None:
 
 
 def test_commands_registered() -> None:
-    assert {"generate", "batch", "validate", "watch", "info", "lint", "diff"} <= _commands()
+    assert {"generate", "batch", "validate", "watch", "info", "lint", "diff", "init"} <= _commands()
+
+
+def test_init_writes_spec_and_generates(tmp_path: Path) -> None:
+    """`sprout init` writes starter.json + atlas/manifest/index.ts; rerun keeps edits."""
+    out = tmp_path / "starter"
+    r = runner.invoke(app, ["init", "--out", str(out)])
+    assert r.exit_code == 0, r.output
+    spec = out / "starter.json"
+    assert spec.is_file()
+    for artifact in ("atlas.png", "manifest.json", "index.ts"):
+        assert (out / artifact).is_file(), artifact
+    assert _crc(out / "atlas.png") == 0xC4CAF76D  # starter seed=7 determinism pin
+
+    edited = json.loads(spec.read_text())
+    edited["seed"] = 999
+    spec.write_text(json.dumps(edited))
+    r2 = runner.invoke(app, ["init", "--out", str(out)])
+    assert r2.exit_code == 0, r2.output
+    assert "keep existing" in r2.output
+    assert json.loads(spec.read_text())["seed"] == 999
+
+
+def test_init_no_generate_flag(tmp_path: Path) -> None:
+    out = tmp_path / "starter"
+    r = runner.invoke(app, ["init", "--out", str(out), "--no-generate"])
+    assert r.exit_code == 0, r.output
+    assert (out / "starter.json").is_file()
+    assert not (out / "atlas.png").exists()
 
 
 def test_watch_regenerates_on_spec_change(tmp_path: Path) -> None:

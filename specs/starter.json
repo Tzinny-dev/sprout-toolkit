@@ -1,0 +1,12 @@
+{
+  "name": "starter_atlas",
+  "seed": 7,
+  "target": "expo-rn-skia",
+  "files": { "atlas": "atlas.png" },
+  "layout": { "framePx": 64, "cols": 4, "tileLogical": 32, "sample": "nearest" },
+  "items": [
+    { "id": "hero", "generator": "blob_walk", "frames": 8 },
+    { "id": "coin", "generator": "props", "frames": 4, "params": { "kind": "flower" } }
+  ],
+  "animations": { "walk": { "frames": "hero", "fps": 8, "loop": true } }
+}
