@@ -118,6 +118,7 @@ def test_watch_skips_unchanged_spec(tmp_path: Path) -> None:
     try:
         _wait(lambda: atlas.is_file(), 20, "initial generation")
         crc1 = _crc(atlas)
+        assert crc1 != 0, "atlas must be fully written before the test proceeds"
         spec.touch()  # changes mtime, not content
         time.sleep(1.5)
         assert _crc(atlas) == crc1  # the atlas doesn't change

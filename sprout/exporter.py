@@ -6,6 +6,7 @@ The generated `index.ts` is the "wired" piece: it requires static assets
 """
 from __future__ import annotations
 
+import io
 import json
 import zlib
 from pathlib import Path
@@ -170,10 +171,36 @@ def apply_png_mode(img: Image.Image, png_mode: str) -> Image.Image:
     return img  # "rgba" (default): no change
 
 
-def write_png(sheet: Image.Image, path: Path, png_mode: str = "rgba") -> int:
+def _atomic_write_bytes(path: Path, data: bytes) -> None:
+    """Write bytes atomically (temp file + os.replace).
+
+    Readers never observe a half-written file: the target path appears only
+    when the content is complete. Matters for `sprout watch` consumers (and
+    tests) that poll for the file's existence while a generation is in flight.
+    """
+    import os
+    import tempfile
+
     path.parent.mkdir(parents=True, exist_ok=True)
-    apply_png_mode(sheet, png_mode).save(path)
-    return zlib.crc32(path.read_bytes()) & 0xFFFFFFFF
+    fd, tmp = tempfile.mkstemp(dir=str(path.parent), prefix=path.name + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(data)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def write_png(sheet: Image.Image, path: Path, png_mode: str = "rgba") -> int:
+    buf = io.BytesIO()
+    apply_png_mode(sheet, png_mode).save(buf, format="PNG")
+    data = buf.getvalue()
+    _atomic_write_bytes(path, data)
+    return zlib.crc32(data) & 0xFFFFFFFF
 
 
 _TP_FORMAT = {"rgba": "RGBA8888", "png24": "RGB888", "png8": "I8"}
@@ -211,8 +238,7 @@ def build_texturepacker(spec: Spec, records: list[dict], atlas_name: str,
 
 
 def write_texturepacker(tp: dict, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(tp, indent=2) + "\n")
+    _atomic_write_bytes(path, (json.dumps(tp, indent=2) + "\n").encode())
 
 
 def compute_mipmap_meta(sheet: Image.Image, spec: Spec, levels: int) -> list[dict]:
@@ -242,17 +268,17 @@ def write_mipmap_files(sheet: Image.Image, out_dir: Path, png_mode: str,
     out_dir.mkdir(parents=True, exist_ok=True)
     for lvl in meta:
         img = sheet.resize((lvl["w"], lvl["h"]), Image.BOX)
-        apply_png_mode(img, png_mode).save(out_dir / lvl["file"])
+        buf = io.BytesIO()
+        apply_png_mode(img, png_mode).save(buf, format="PNG")
+        _atomic_write_bytes(out_dir / lvl["file"], buf.getvalue())
 
 
 def write_manifest(manifest: dict, path: Path) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(manifest, indent=2) + "\n")
+    _atomic_write_bytes(path, (json.dumps(manifest, indent=2) + "\n").encode())
 
 
 def emit_index_ts(manifest: dict, out_path: Path) -> None:
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(_ts_source(manifest))
+    _atomic_write_bytes(out_path, _ts_source(manifest).encode())
 
 
 def _ts_shader_block(m: dict) -> str:
