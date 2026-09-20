@@ -3,8 +3,11 @@ un glifo por frame.
 
 A diferencia del resto de generadores (100% procedurales), ``font`` depende
 de un archivo de fuente en disco. Por defecto usa la fuente empaquetada en
-``assets/fonts/DejaVuSansMono-Bold.ttf`` (licencia Bitstream Vera, ver
-``.LICENSE.txt`` junto al archivo); ``font_path`` permite apuntar a otra.
+``sprout/assets/fonts/DejaVuSansMono-Bold.ttf`` (licencia Bitstream Vera, ver
+``.LICENSE.txt`` junto al archivo) — vive **dentro** del paquete `sprout`
+(no en `cli/assets/`) para que un `pip install` real (no editable) la
+incluya vía `[tool.setuptools.package-data]`; ``font_path`` permite apuntar
+a otra fuente.
 
 Parámetros de spec (item.params):
     chars     : caracteres a generar, uno por frame (default ASCII imprimible
@@ -30,7 +33,7 @@ from .base import FrameData, Generator
 DEFAULT_CHARS = "".join(chr(c) for c in range(32, 127))  # ASCII imprimible
 
 BUNDLED_FONT = (
-    Path(__file__).resolve().parents[2] / "assets" / "fonts" / "DejaVuSansMono-Bold.ttf"
+    Path(__file__).resolve().parents[1] / "assets" / "fonts" / "DejaVuSansMono-Bold.ttf"
 )
 
 

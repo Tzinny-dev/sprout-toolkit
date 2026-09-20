@@ -7,7 +7,7 @@ name = "sprout"
 version = "0.1.0"
 description = "Generación procedural determinista de assets 2D para Expo + react-native-skia"
 requires-python = ">=3.10"
-license = { text = "MIT" }
+license = { file = "LICENSE" }
 dependencies = [
     "pillow>=10",
     "typer>=0.12",
@@ -21,6 +21,9 @@ sprout = "sprout.cli:app"
 
 [tool.setuptools.packages.find]
 include = ["sprout*"]
+
+[tool.setuptools.package-data]
+sprout = ["assets/fonts/*.ttf", "assets/fonts/*.txt"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
