@@ -36,12 +36,13 @@ export default defineConfig({
     }),
     spaFallback(),
   ],
-  // GitHub Pages project site: served from /sprout-toolkit/, NOT from /.
-  // Without this, index.html requests /assets/*.js from the domain root
-  // (tzinny-dev.github.io/assets/...) → 404 → blank page. Must be absolute
-  // (not './') so deep links like /sprout-toolkit/docs/spec resolve assets
-  // correctly when served via the 404.html SPA fallback.
-  base: '/sprout-toolkit/',
+  // Custom domain (sprout-toolkit.tzinny.com) serves the site from the
+  // domain root. The legacy https://tzinny-dev.github.io/sprout-toolkit URL
+  // is redirected to the custom domain by the inline script in index.html
+  // (GitHub's own default-domain redirect may preserve the project prefix).
+  // NOTE: publishing this change requires the custom domain's DNS to be
+  // active — with base '/', assets on github.io would 404 otherwise.
+  base: '/',
   build: {
     // Must NOT be `../dist`: that directory belongs to the Python package
     // builds (python -m build / twine upload) and CI wipes it on release.

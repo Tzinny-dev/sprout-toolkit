@@ -24,9 +24,10 @@ const router = createBrowserRouter(
       ],
     },
   ],
-  // Strip the trailing slash: BASE_URL is '/sprout-toolkit/' but react-router
-  // expects basename without it.
-  { basename: import.meta.env.BASE_URL.replace(/\/$/, '') },
+  // BASE_URL is '/sprout-toolkit/' under the legacy project-site base and
+  // '/' on the custom domain. react-router wants '/' (its default) rather
+  // than the empty string that a naive trailing-slash strip would produce.
+  { basename: import.meta.env.BASE_URL.replace(/\/$/, '') || '/' },
 );
 
 createRoot(document.getElementById('root') as HTMLElement).render(

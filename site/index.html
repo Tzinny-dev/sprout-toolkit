@@ -6,6 +6,27 @@
     <title>Sprout Toolkit — Deterministic procedural 2D assets for Expo + Skia</title>
     <meta name="description" content="sprout-toolkit: deterministic spritesheets, autotiles, bitmap fonts + SkSL shaders for Expo + react-native-skia — from JSON specs. Same seed, same pixels, testable in CI." />
     <link rel="icon" href="/favicon.svg" />
+    <script>
+      // Legacy GitHub Pages URL → custom domain. The custom domain serves this
+      // site at its root, so the /sprout-toolkit project prefix is stripped.
+      // Runs before any asset request: with base '/', the assets on github.io
+      // would 404, so redirect first. location.replace avoids history loops.
+      (function () {
+        var PROJECT = '/sprout-toolkit';
+        var DOMAIN = 'https://sprout-toolkit.tzinny.com';
+        var path = location.pathname;
+        var rest =
+          path === PROJECT ? '/'
+          : path.indexOf(PROJECT + '/') === 0 ? path.slice(PROJECT.length)
+          : null;
+        if (location.hostname === 'tzinny-dev.github.io') {
+          location.replace(DOMAIN + (rest !== null ? rest : '/') + location.search + location.hash);
+        } else if (rest !== null) {
+          // Defensive: a redirect from github.io preserved the prefix — drop it.
+          location.replace(DOMAIN + rest + location.search + location.hash);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
