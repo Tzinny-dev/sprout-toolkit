@@ -7,22 +7,27 @@ import { DocsIndex } from './pages/docs/DocsIndex';
 import { DocPage } from './pages/docs/DocPage';
 import './index.css';
 
-const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <Layout />,
-    children: [
-      { index: true, element: <Home /> },
-      {
-        path: 'docs',
-        children: [
-          { index: true, element: <DocsIndex /> },
-          { path: ':docId', element: <DocPage /> },
-        ],
-      },
-    ],
-  },
-]);
+const router = createBrowserRouter(
+  [
+    {
+      path: '/',
+      element: <Layout />,
+      children: [
+        { index: true, element: <Home /> },
+        {
+          path: 'docs',
+          children: [
+            { index: true, element: <DocsIndex /> },
+            { path: ':docId', element: <DocPage /> },
+          ],
+        },
+      ],
+    },
+  ],
+  // Strip the trailing slash: BASE_URL is '/sprout-toolkit/' but react-router
+  // expects basename without it.
+  { basename: import.meta.env.BASE_URL.replace(/\/$/, '') },
+);
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

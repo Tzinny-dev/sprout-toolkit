@@ -36,7 +36,12 @@ export default defineConfig({
     }),
     spaFallback(),
   ],
-  base: '/', // GitHub Pages served from / on a custom 404.html fallback
+  // GitHub Pages project site: served from /sprout-toolkit/, NOT from /.
+  // Without this, index.html requests /assets/*.js from the domain root
+  // (tzinny-dev.github.io/assets/...) → 404 → blank page. Must be absolute
+  // (not './') so deep links like /sprout-toolkit/docs/spec resolve assets
+  // correctly when served via the 404.html SPA fallback.
+  base: '/sprout-toolkit/',
   build: {
     // Must NOT be `../dist`: that directory belongs to the Python package
     // builds (python -m build / twine upload) and CI wipes it on release.
