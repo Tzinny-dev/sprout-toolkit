@@ -7,6 +7,8 @@ from PIL import Image, ImageDraw
 
 from sprout.exporter import (
     apply_png_mode,
+    build_manifest,
+    render_items,
     build_sheet,
     build_texturepacker,
     compute_mipmap_meta,
@@ -124,3 +126,15 @@ def test_build_sheet_omits_anchor_when_absent() -> None:
     frames_without_anchor = [FrameData(id="spark_00", image=img)]
     _, records = build_sheet(spec, [frames_without_anchor])
     assert "anchor" not in records[0]
+
+
+# ── build_manifest: generator provenance ─────────────────────────────────────
+def test_manifest_includes_generator_provenance() -> None:
+    from sprout import __version__
+    spec = load_spec(SPECS / "starter.json")
+    frames = render_items(spec)
+    sheet, records = build_sheet(spec, frames)
+    manifest = build_manifest(spec, records, spec.filename, sheet, str(SPECS / "starter.json"))
+    # The manifest records which toolkit + version produced it — useful for
+    # debugging user reports and verifying reproducibility across versions.
+    assert manifest["meta"]["generator"] == {"name": "sprout", "version": __version__}

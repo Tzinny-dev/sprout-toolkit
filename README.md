@@ -192,6 +192,39 @@ across Python 3.10–3.13.
 Publishing to PyPI is manual (`.github/workflows/publish.yml`, trusted
 publishing via OIDC) — see [CHANGELOG](CHANGELOG.md).
 
+## Releasing / Emergency Rollback
+
+CI (`.github/workflows/tests.yml`) runs the full suite on every push/PR,
+across Python 3.10–3.13, and includes a wheel smoke test (build, install in a
+clean venv, `sprout --version`). Publishing to PyPI is manual
+(`.github/workflows/publish.yml`, trusted publishing via OIDC) — see
+[CHANGELOG](CHANGELOG.md).
+
+### Releasing (P1 checklist)
+
+1. Bump `version` in `pyproject.toml` **and** `sprout/__init__.py` (kept in
+   sync by the `check-version` job in `publish.yml`).
+2. Add a `## [<version>]` section to `CHANGELOG.md` under `[Unreleased]`.
+3. Tag and push: `git tag v<version> && git push origin v<version>` **is not
+   enough on its own** — the `publish` workflow is `workflow_dispatch` only
+   (never tag-triggered). Go to GitHub Actions → `publish` → "Run workflow" and
+   pass the exact version string.
+4. Add a GitHub Release (auto-drafting from the tag is fine) with the
+   `CHANGELOG` section as notes.
+
+### Emergency rollback
+
+PyPI versions are **immutable** — never delete, only **yank**:
+
+1. On https://pypi.org/manage/project/sprout-toolkit/release/<version>/, click
+   **Delete all files** (irreversible) for small issues, or **yank** (keeps the
+   version but blocks installs) for egregious bugs.
+2. Bump a patch (`0.2.1` → `0.2.2`) immediately with a fix; never re-use a
+   yanked version number.
+3. If the GitHub Release asset was also bad, delete the tag + release and
+   re-tag on the fixed commit.
+4. Post an incident note on the release you yanked linking to the replacement.
+
 ## Credits
 
 - `typer` + `Pillow` — CLI and image generation

@@ -409,6 +409,15 @@ export interface MipmapsBlock {{
   levels: MipmapLevel[];
 }}
 
+export interface GeneratorMeta {{
+  name: string;
+  version: string;
+}}
+export interface ManifestMeta {{
+  provenance: {{ spec: string; git: string }};
+  generator: GeneratorMeta;
+}}
+
 export interface Manifest {{
   schema: string;
   name: string;
@@ -423,12 +432,13 @@ export interface Manifest {{
   shader?: ShaderBlock;
   font?: FontBlock;
   mipmaps?: MipmapsBlock;
-  meta: unknown;
+  meta: ManifestMeta;
 }}
 
 {shader_block}
 export const ATLAS_SOURCE = require('./{atlas}') as number;
 export const manifest: Manifest = require('./manifest.json') as Manifest;
+export const GENERATOR = manifest.meta?.generator ?? {{ name: 'sprout', version: 'unknown' }};
 export const sampleMode =
   manifest.units.sample === 'nearest' ? FilterMode.Nearest : FilterMode.Linear;
 

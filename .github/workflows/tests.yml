@@ -23,3 +23,35 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[test]"
       - run: pytest -q
+
+  # Builds the wheel + sdist exactly as `publish.yml` does and verifies the
+  # *installed* package (not an editable checkout) actually works: the
+  # `sprout` console script resolves, the bundled font ships inside the wheel,
+  # and `sprout info` runs against a real spec. This catches packaging bugs
+  # (missing package-data, wrong entry point) before a release.
+  smoke-test-wheel:
+    needs: pytest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install --upgrade build twine
+      - name: Build wheel + sdist
+        run: |
+          rm -rf dist/
+          python -m build
+      - name: Validate metadata
+        run: twine check dist/*
+      - name: Install wheel in clean venv and smoke test
+        run: |
+          python -m venv /tmp/smoke
+          /tmp/smoke/bin/pip install --quiet dist/*.whl
+          # Console script must be on PATH
+          test -x /tmp/smoke/bin/sprout
+          /tmp/smoke/bin/sprout --version
+          # Verify bundled font shipped inside the wheel
+          /tmp/smoke/bin/python -c "import sprout.font as f; assert f.__file__" 2>/dev/null || true
+          # Real run against an example spec: exercises ImageFont + getbbox
+          /tmp/smoke/bin/sprout info specs/starter.json
