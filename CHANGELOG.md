@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- `index.ts` now exports a typed `GENERATOR` (`{ name, version }`) plus the
+  `ManifestMeta` / `GeneratorMeta` interfaces — `manifest.meta` is typed
+  instead of `unknown`. Includes a manifest provenance test.
+- Wheel smoke test in CI (`smoke-test-wheel` job): build → `twine check` →
+  install the wheel in a clean venv → `sprout --version` / `sprout info`.
+- Release checklist + emergency rollback playbook in the README.
+- Reference docs: spec schema, generators (params + defaults), CLI commands
+  and export options, and the manifest/index.ts API (`docs/*.md`).
+- `site/`: React + Vite landing page with the full docs section, auto-deployed
+  to GitHub Pages (`.github/workflows/pages.yml`).
+
+### Changed
+
+- Pillow dependency pinned to `>=10,<13` — the suite is validated against
+  12.3.0; Pillow 14 (2027) deprecates `Image.getdata` (tests only).
+
 ## [0.2.1] — 2026-09-20
 
 ### Fixed

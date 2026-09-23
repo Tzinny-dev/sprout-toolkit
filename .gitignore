@@ -6,6 +6,10 @@ __pycache__/
 build/
 dist/
 
+# Node / sitio web (site/)
+node_modules/
+site/dist/
+
 # Venvs
 .venv/
 venv/
