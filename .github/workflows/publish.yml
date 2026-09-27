@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version to release (must match pyproject.toml, e.g. 0.2.0)"
+        description: "Version to release (must match pyproject.toml, sprout/__init__.py and npm/package.json, e.g. 0.3.0)"
         required: true
         type: string
 
@@ -32,14 +32,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Version matches pyproject.toml
+      - name: Version matches pyproject.toml, sprout/__init__.py and npm/package.json
         run: |
+          WANT="${{ inputs.version }}"
           PKG_VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
-          echo "pyproject version: $PKG_VERSION / requested: ${{ inputs.version }}"
-          test "$PKG_VERSION" = "${{ inputs.version }}" || {
-            echo "::error::Input version '${{ inputs.version }}' != pyproject version '$PKG_VERSION'. Bump the version in pyproject.toml (and sprout/__init__.py) and commit first."
-            exit 1
-          }
+          INIT_VERSION=$(python3 -c "import re, pathlib; print(re.search(r'__version__ = \"([^\"]+)\"', pathlib.Path('sprout/__init__.py').read_text()).group(1))")
+          NPM_VERSION=$(python3 -c "import json; print(json.load(open('npm/package.json'))['version'])")
+          echo "requested: $WANT / pyproject: $PKG_VERSION / __init__: $INIT_VERSION / npm: $NPM_VERSION"
+          fail() { echo "::error::$1"; exit 1; }
+          test "$PKG_VERSION" = "$WANT" || fail "Input '$WANT' != pyproject '$PKG_VERSION'. Bump the version in pyproject.toml (and sprout/__init__.py + npm/package.json) and commit first."
+          test "$INIT_VERSION" = "$WANT" || fail "sprout/__init__.py ($INIT_VERSION) != '$WANT' — the three version sources must match (asserted by tests/test_fase8.py)."
+          test "$NPM_VERSION" = "$WANT" || fail "npm/package.json ($NPM_VERSION) != '$WANT' — the npm wrapper pins the CLI exactly."
       - name: Version not already on PyPI
         run: |
           STATUS=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/sprout-toolkit/${{ inputs.version }}/json")
