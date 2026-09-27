@@ -33,7 +33,7 @@ export const DOCS: DocEntry[] = [
     id: 'generators',
     title: 'Generators',
     description:
-      'The 7 generators and their params with defaults: terrain, blob_walk, props, critter, particles, ui, font.',
+      'The 9 generators and their params with defaults: terrain, blob_walk, props, critter, flora, face, particles, ui, font.',
     md: generators,
   },
   {

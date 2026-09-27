@@ -15,6 +15,8 @@ See [spec schema](/docs/spec) for `colors` + `tint` (runtime recoloring).
 | `blob_walk` | 8-frame walk cycle (hero blob) | 8 |
 | `props` | Static objects with anchor points | any |
 | `critter` | Parametric animals (5 archetypes + parts) | any (idle) |
+| `flora` | Trees (3 canopies) + forest-floor plants | any (idle or sway) |
+| `face` | Emotion faces (16 moods + part overrides) | any (idle + blink) |
 | `particles` | Animated bursts with easing | any |
 | `ui` | Button / slider / 9-patch panel | see per-kind |
 | `font` | Bitmap font from TTF, one glyph per frame | `len(chars)` |
@@ -90,6 +92,63 @@ without muddying. Showcase: `docs/showcase/critter.png`.
 Not every part applies to every archetype (`bug` ignores `snout`/`tail`,
 `fish` ignores `legs`/`ears`) — the value is validated against the part's
 own vocabulary, not per archetype. Example spec: `specs/critter.json`.
+
+## `flora`
+
+Trees and forest-floor plants. Anatomy (canopy shape, trunk style, plant
+form, proportions) derives from the item's **seed slot**, never the frame
+index, so every frame of an item is the *same* plant; frames differ only
+by the optional `sway` phase (`sin(tau * i / count)` pivoting at the
+ground). Canopies use a union-outline pass — lobes drawn in outline color
+first, fill on top — so the silhouette gets a clean ring with no internal
+arcs. Showcase: `docs/showcase/flora.png`, `docs/showcase/flora_sway.gif`.
+
+| param | default | description |
+|---|---|---|
+| `kind` | `tree` | `tree` \| `plant` |
+| `canopy` | `auto` | tree: `auto` \| `round` \| `columnar` \| `conifer` |
+| `trunk` | `auto` | tree: `auto` \| `straight` \| `gnarled` (lean + kink) |
+| `form` | `auto` | plant: `auto` \| `fern` \| `sprout` \| `grass` \| `blossom` |
+| `sway` | `false` | wind phase across frames (needs `frames` ≥ 4) |
+| `fill` | per-kind | `[r, g, b]` foliage / leaf color |
+| `bark` | per-kind | `[r, g, b]` trunk (tree) / stem (plant) |
+| `accent` | per-kind | `[r, g, b]` blossom petals / fruit |
+
+`auto` lets the seed pick. Default palettes are colored (green foliage),
+so `tint: shade` re-hues them via luminance like any other generator.
+
+## `face`
+
+Emotion faces: 16 `mood` presets that combine eyes / mouth / brows /
+extras into coherent expressions, plus per-part overrides that win over
+the mood. Anatomy (head shape, eye and mouth scale) derives from the
+item's **seed slot**, so all frames of an item are the same character.
+
+With `count` ≥ 4 and blinkable eyes (`open`, `wide`, `wink`, `heart`)
+exactly **one frame** per loop is the blink (eyes closed) — verified by
+test. Showcase: `docs/showcase/face.png`.
+
+| param | default | description |
+|---|---|---|
+| `mood` | `auto` | `auto` \| `neutral` \| `happy` \| `joy` \| `laugh` \| `sad` \| `cry` \| `angry` \| `scared` \| `surprised` \| `sleepy` \| `wink` \| `love` \| `confused` \| `worried` \| `determined` \| `dizzy` |
+| `head` | `auto` | `auto` \| `round` \| `oval` \| `square` \| `wide` |
+| `eyes` | `auto` | `auto` \| `open` \| `wide` \| `happy` \| `closed` \| `wink` \| `heart` \| `x` |
+| `mouth` | `auto` | `auto` \| `flat` \| `smile` \| `grin` \| `open` \| `frown` \| `wavy` \| `cat` |
+| `brows` | `auto` | `auto` \| `none` \| `flat` \| `angry` \| `sad` \| `raised` |
+| `extras` | `auto` | `auto` \| `none` \| `blush` \| `sweat` \| `tears` \| `anger` |
+| `fill` | `[245, 227, 201]` | `[r, g, b]` head tone |
+| `outline` | `[70, 54, 48]` | `[r, g, b]` outline |
+| `eye` | `[38, 34, 32]` | `[r, g, b]` pupils / closed lines |
+| `eye_white` | `[255, 255, 255]` | `[r, g, b]` sclera |
+| `accent` | `[244, 138, 150]` | `[r, g, b]` blush / heart eyes |
+| `drop` | `[120, 190, 245]` | `[r, g, b]` sweat / tears |
+| `mouth` | `[92, 54, 50]` | `[r, g, b]` mouth interior |
+| `tongue` | `[240, 128, 128]` | `[r, g, b]` tongue |
+| `anger` | `[222, 70, 58]` | `[r, g, b]` anger mark |
+
+A part param (`eyes`, `mouth`, …) overrides the mood's choice for that
+part only; `mood: auto` resolves to one of the 16 presets from the seed.
+Example specs: `specs/flora.json`, `specs/face.json`.
 
 ## `particles`
 

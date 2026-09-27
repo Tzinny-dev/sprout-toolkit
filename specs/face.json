@@ -1,0 +1,29 @@
+{
+  "name": "face_atlas",
+  "seed": 8191,
+  "target": "expo-rn-skia",
+  "files": { "atlas": "atlas.png" },
+  "layout": { "framePx": 64, "cols": 8, "tileLogical": 32, "sample": "nearest" },
+  "items": [
+    { "id": "neutral",    "generator": "face", "frames": 1, "params": { "mood": "neutral" } },
+    { "id": "happy",      "generator": "face", "frames": 1, "params": { "mood": "happy" } },
+    { "id": "joy",        "generator": "face", "frames": 1, "params": { "mood": "joy" } },
+    { "id": "laugh",      "generator": "face", "frames": 1, "params": { "mood": "laugh" } },
+    { "id": "sad",        "generator": "face", "frames": 1, "params": { "mood": "sad" } },
+    { "id": "cry",        "generator": "face", "frames": 1, "params": { "mood": "cry" } },
+    { "id": "angry",      "generator": "face", "frames": 1, "params": { "mood": "angry" } },
+    { "id": "scared",     "generator": "face", "frames": 1, "params": { "mood": "scared" } },
+    { "id": "surprised",  "generator": "face", "frames": 1, "params": { "mood": "surprised" } },
+    { "id": "sleepy",     "generator": "face", "frames": 1, "params": { "mood": "sleepy" } },
+    { "id": "wink",       "generator": "face", "frames": 1, "params": { "mood": "wink" } },
+    { "id": "love",       "generator": "face", "frames": 1, "params": { "mood": "love" } },
+    { "id": "confused",   "generator": "face", "frames": 1, "params": { "mood": "confused" } },
+    { "id": "worried",    "generator": "face", "frames": 1, "params": { "mood": "worried" } },
+    { "id": "determined", "generator": "face", "frames": 1, "params": { "mood": "determined" } },
+    { "id": "dizzy",      "generator": "face", "frames": 1, "params": { "mood": "dizzy" } },
+    { "id": "blink",      "generator": "face", "frames": 4, "params": { "mood": "happy" } }
+  ],
+  "animations": {
+    "blink": { "frames": "blink", "fps": 6, "loop": true }
+  }
+}

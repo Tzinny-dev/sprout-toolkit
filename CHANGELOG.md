@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`flora` generator**: trees and forest-floor plants. Trees combine a
+  tapered trunk (`straight` / `gnarled` = lean + kink) with three canopy
+  shapes (`round`, `columnar`, `conifer`) via a union-outline pass;
+  plants are undergrowth forms (`fern`, `sprout`, `grass`, `blossom`)
+  picked by seed. Anatomy derives from the item's seed slot; optional
+  `sway` animates the canopy / stem across frames (pivot at the ground).
+  Spec: `specs/flora.json`, showcase: `docs/showcase/flora.png` +
+  `flora_sway.gif`.
+- **`face` generator**: emotion faces — 16 `mood` presets
+  (`neutral` … `dizzy`) combining eyes / mouth / brows / extras, with
+  per-part overrides that win over the mood and four head shapes.
+  One-frame blink per loop (≥ 4 frames, blinkable eyes), verified by
+  test. Spec: `specs/face.json`, showcase: `docs/showcase/face.png`.
 - **`critter` generator**: parametric animals — `quadruped`, `bird`,
   `fish`, `reptile`, `bug` (top view) with composable parts
   (`ears`/`snout`/`tail`/`legs`/`wings`, `facing`, color overrides).

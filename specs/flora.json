@@ -1,0 +1,21 @@
+{
+  "name": "flora_atlas",
+  "seed": 4242,
+  "target": "expo-rn-skia",
+  "files": { "atlas": "atlas.png" },
+  "layout": { "framePx": 64, "cols": 8, "tileLogical": 32, "sample": "nearest" },
+  "items": [
+    { "id": "oak",     "generator": "flora", "frames": 4, "params": { "canopy": "round", "sway": true } },
+    { "id": "poplar",  "generator": "flora", "frames": 1, "params": { "canopy": "columnar" } },
+    { "id": "pine",    "generator": "flora", "frames": 1, "params": { "canopy": "conifer" } },
+    { "id": "gnarled", "generator": "flora", "frames": 1, "params": { "canopy": "round", "trunk": "gnarled" } },
+    { "id": "fern",    "generator": "flora", "frames": 1, "params": { "kind": "plant", "form": "fern" } },
+    { "id": "sprout",  "generator": "flora", "frames": 1, "params": { "kind": "plant", "form": "sprout" } },
+    { "id": "grass",   "generator": "flora", "frames": 4, "params": { "kind": "plant", "form": "grass", "sway": true } },
+    { "id": "blossom", "generator": "flora", "frames": 1, "params": { "kind": "plant", "form": "blossom" } }
+  ],
+  "animations": {
+    "sway":      { "frames": "oak",   "fps": 4, "loop": true },
+    "grass_sway": { "frames": "grass", "fps": 4, "loop": true }
+  }
+}
