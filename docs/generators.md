@@ -14,6 +14,7 @@ See [spec schema](/docs/spec) for `colors` + `tint` (runtime recoloring).
 | `terrain` | Seamless noise tiles + 16/47 autotile | any (47 or 16 with `autotile`) |
 | `blob_walk` | 8-frame walk cycle (hero blob) | 8 |
 | `props` | Static objects with anchor points | any |
+| `critter` | Parametric animals (5 archetypes + parts) | any (idle) |
 | `particles` | Animated bursts with easing | any |
 | `ui` | Button / slider / 9-patch panel | see per-kind |
 | `font` | Bitmap font from TTF, one glyph per frame | `len(chars)` |
@@ -55,6 +56,40 @@ the point where the object touches the ground, for tilemap-aligned placement.
 | `kind` | `rock` | `rock` \| `bush` \| `chest` \| `mushroom` \| `flower` |
 | `fill` | per-kind | `[r, g, b]` fill override |
 | `outline` | per-kind | `[r, g, b]` outline override |
+
+## `critter`
+
+Parametric creatures. Five body plans — `quadruped`, `bird`, `fish`,
+`reptile` (side view, facing right) and `bug` (top view) — with composable
+parts. Anatomy (ears / snout / tail / legs / wings and the size ratios)
+derives from the item's **seed slot**, never the frame index, so every frame
+of an item is the same species; frames differ only by the idle pose
+(breathing sine + a one-frame blink).
+
+`"auto"` lets the seed pick among the archetype's options
+(`bird` → fan tail + beak, `reptile` → splayed legs + long tail, …). The
+default palette is a neutral warm gray ramp, so `tint: shade` re-hues it
+without muddying. Showcase: `docs/showcase/critter.png`.
+
+| param | default | description |
+|---|---|---|
+| `archetype` | `quadruped` | `quadruped` \| `bird` \| `fish` \| `reptile` \| `bug` |
+| `facing` | `right` | `right` \| `left` (horizontal mirror) |
+| `ears` | `auto` | `auto` \| `none` \| `round` \| `pointy` \| `long` |
+| `snout` | `auto` | `auto` \| `none` \| `short` \| `long` \| `beak` |
+| `tail` | `auto` | `auto` \| `none` \| `short` \| `long` \| `bushy` \| `fan` |
+| `legs` | `auto` | `auto` \| `none` \| `stubby` \| `thin` \| `splayed` |
+| `wings` | `auto` | `auto` \| `none` \| `small` \| `spread` |
+| `fill` | `[216, 210, 200]` | `[r, g, b]` body fill |
+| `outline` | `[48, 44, 40]` | `[r, g, b]` outline |
+| `belly` | `[242, 238, 230]` | `[r, g, b]` belly / muzzle |
+| `eye` | `[32, 30, 28]` | pupil |
+| `eye_white` | `[255, 255, 255]` | sclera |
+| `beak` | `[240, 170, 60]` | beak |
+
+Not every part applies to every archetype (`bug` ignores `snout`/`tail`,
+`fish` ignores `legs`/`ears`) — the value is validated against the part's
+own vocabulary, not per archetype. Example spec: `specs/critter.json`.
 
 ## `particles`
 

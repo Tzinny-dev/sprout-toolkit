@@ -1,0 +1,18 @@
+{
+  "name": "critter_atlas",
+  "seed": 1337,
+  "target": "expo-rn-skia",
+  "files": { "atlas": "atlas.png" },
+  "layout": { "framePx": 64, "cols": 8, "tileLogical": 32, "sample": "nearest" },
+  "items": [
+    { "id": "quad",   "generator": "critter", "frames": 4, "params": { "archetype": "quadruped" } },
+    { "id": "bird",   "generator": "critter", "frames": 4, "params": { "archetype": "bird" } },
+    { "id": "fish",   "generator": "critter", "frames": 4, "params": { "archetype": "fish" } },
+    { "id": "rept",   "generator": "critter", "frames": 4, "params": { "archetype": "reptile" } },
+    { "id": "bug",    "generator": "critter", "frames": 4, "params": { "archetype": "bug" } },
+    { "id": "bunny",  "generator": "critter", "frames": 4, "params": { "archetype": "quadruped", "ears": "long", "tail": "bushy", "snout": "long" } },
+    { "id": "fox",    "generator": "critter", "frames": 4, "params": { "archetype": "quadruped", "ears": "pointy", "tail": "long", "facing": "left" } },
+    { "id": "beetle", "generator": "critter", "frames": 4, "params": { "archetype": "bug", "wings": "small" } }
+  ],
+  "animations": { "idle": { "frames": "quad", "fps": 6, "loop": true } }
+}

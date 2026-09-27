@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`critter` generator**: parametric animals — `quadruped`, `bird`,
+  `fish`, `reptile`, `bug` (top view) with composable parts
+  (`ears`/`snout`/`tail`/`legs`/`wings`, `facing`, color overrides).
+  Anatomy derives from the item's seed slot, so all frames of an item are
+  the same species; frames animate a breathing idle + a one-frame blink.
+  Neutral tint-ready palette. Spec: `specs/critter.json`,
+  showcase: `docs/showcase/critter.png` + `critter_idle.gif`.
 - **Runtime tint (color variants)**: specs can declare a `colors` palette
   (`[{key, hex}]`) and mark items as `tint: shade | full`. The manifest gains
   a `tint` block and `index.ts` exports `TINTS`, `TINT_MODES`,
