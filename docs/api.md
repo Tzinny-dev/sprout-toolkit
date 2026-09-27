@@ -68,6 +68,7 @@ interface TintBlock { colors: TintColor[]; items: Record<string, TintMode> }
 |---|---|
 | `manifest` | the parsed `manifest.json`, typed |
 | `ATLAS_SOURCE` | static `require()` of the PNG (Metro/EAS-safe) |
+| `SILHOUETTE_SOURCE` | static `require()` of the prebaked mask (`null` without `--silhouette`) |
 | `frameScale` | `tileLogical / framePx` (e.g. `0.5`) |
 | `tileFrames` | `Frame[]` of all `terrain` items |
 | `AUTOTILE_BITS` | `N/NE/E/SE/S/SW/W/NW` bit flags |
@@ -84,6 +85,7 @@ interface TintBlock { colors: TintColor[]; items: Record<string, TintMode> }
 frameById(id: string): Frame            // throws on unknown id
 framesFor(animId: string): Frame[]      // animation → frames
 rectFor(frameId: string)                // {x,y,w,h} with half-texel inset (anti-bleed)
+spriteLayout(id, cx, cy, size)           // SpriteSpec: center the frame's box in a size x size target
 autotileFrame(mask: number, item?): Frame
 canonicalMask(mask: number, size: 16 | 47): number
 glyphFrame(char: string, item?): Frame
@@ -122,15 +124,23 @@ const colors = tintColors(specs, 'ember');
 **Hidden items (mode ciego)** — no extra atlas frames:
 
 ```tsx
-const colors = silhouetteColors(specs);           // batch path
-// or: const paint = silhouettePaint();            // paint path
+const s = useSilhouetteSprites(specs);   // one call: sprites + black x alpha colors
+<Atlas {...s} colors={s.colors} colorBlendMode="modulate" />
+// or the lower-level pieces:
+const colors = silhouetteColors(specs);  // batch path
+const paint = silhouettePaint();         // paint path
 ```
+
+Or point at the prebaked mask (`generate --silhouette`):
+`useSilhouetteImage()` loads `SILHOUETTE_SOURCE` (`null` without the flag).
 
 ### Rendering hooks (react-native-skia)
 
 ```ts
 useAtlasImage(): SkImage | undefined     // loads ATLAS_SOURCE
+useSilhouetteImage(): SkImage | null     // loads SILHOUETTE_SOURCE (null without --silhouette)
 useAtlasSprites(specs, scale?): { image, sprites, transforms, sampling }
+useSilhouetteSprites(specs, scale?):     // useAtlasSprites + colors (black x alpha)
 useAtlasGrid(ids, cols, origin?, tile?): same shape, laid out on a grid
 useAtlasBatch(specs, extra?, scale?):    // imperative path: preallocated buffers
 toSpecData(specs, scale?): SpriteSpecData     // flat tuples for worklets
@@ -144,6 +154,33 @@ simple, ideal for UI and small scenes. `useAtlasBatch` +
 `makeStaticAtlasPicture` preallocate rect/RSXform buffers and can bake a whole
 tilemap into a single `SkPicture` (one `drawAtlas`) — validated on a Pixel 8
 against the declarative path (per-tile diff 0.92 vs 0.95, both acceptable).
+
+## Resolution tiers (`--tiers 64,128,256`)
+
+`sprout generate <spec> --tiers 64,128,256` writes one full output per
+resolution — `<out>/<px>/{atlas,manifest,index}` — plus a combined
+`<out>/index.ts` that routes between them:
+
+```ts
+export type Tier = 64 | 128 | 256;
+export const TIERS: readonly Tier[];
+export const atlasSources: Record<Tier, { atlas: number; manifest: Manifest }>;
+export function pickTier(px: number): Tier;  // smallest tier >= px (else largest)
+```
+
+The base (smallest) tier's API is re-exported, so a single import gives
+both the router and the helpers:
+
+```tsx
+import { atlasSources, pickTier } from './assets/tiers';
+
+const tier = pickTier(200);                    // -> 256
+const { atlas, manifest } = atlasSources[tier];
+```
+
+One spec drives every tier (`--tiers` overrides `layout.framePx` per
+output). Pair a smaller tier with `sample: "linear"` when you display it
+larger than its native pixels.
 
 ## Minimal usage
 

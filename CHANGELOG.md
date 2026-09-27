@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Multi-escala (`--tiers`)**: `sprout generate <spec> --tiers 64,128,256`
+  emits one full output per resolution in `<px>/` subdirs plus a combined
+  `index.ts` (`atlasSources`, `TIERS`, `pickTier`, base-tier re-export).
+  Sister resolutions no longer need sister spec files — one spec drives
+  them all. Companion `--frame-px` overrides `layout.framePx` for a single
+  output. `sample: linear` documented for displaying a smaller tier larger.
+- **Silhouettes**: prebaked mask via `generate`/`batch --silhouette`
+  (`silhouette.png` = black × original alpha, `files.silhouette` in the
+  manifest, `SILHOUETTE_SOURCE` + `useSilhouetteImage()` in `index.ts`);
+  runtime stays primary — new `useSilhouetteSprites(specs)` hook returns
+  `useAtlasSprites` + black×alpha colors in one call, and
+  `spriteLayout(id, cx, cy, size)` centers a frame in a box/circle.
+  Tests: `tests/test_multiscale.py` (14).
 - **`sprout catalog <file> --field <name> --map mapping.json`**: codegen
   from any catalog (`.json` list or flat-object `.ts` list) — extracts
   ids and materializes a spec by applying an external mapping

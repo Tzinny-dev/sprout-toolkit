@@ -33,7 +33,7 @@ fails `sprout validate` / `generate` with a descriptive error.
 | `framePx` | `64` | `> 0` — pixels per frame in the atlas |
 | `cols` | — | **required**, `> 0` — spritesheet grid columns (rows = ceil(total / cols)) |
 | `tileLogical` | `32` | `> 0` — logical tile size on screen (`frameScale = tileLogical / framePx`) |
-| `sample` | `nearest` | `nearest` \| `linear` — sampling mode for Skia |
+| `sample` | `nearest` | `nearest` \| `linear` — sampling mode for Skia; `linear` suits displaying a frame larger than its native `framePx` (e.g. a smaller tier upscaled) |
 
 ## Items
 

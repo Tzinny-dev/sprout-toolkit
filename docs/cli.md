@@ -26,7 +26,21 @@ Generates one spec: `atlas.png` + `manifest.json` + `index.ts` (plus optional
 sprout generate specs/demo.json --out ./out
 sprout generate specs/demo.json --seed 42        # override the spec's seed
 sprout generate specs/demo.json --skip-existing   # no-op if output unchanged (CRC probe)
+
+# Multi-resolution: one atlas per tier in <px>/ subdirs + a combined index.ts
+sprout generate specs/demo.json --tiers 64,128,256 --out ./tiers
+#   tiers/64/{atlas,manifest,index}.png|json|ts …  tiers/index.ts
+#   -> atlasSources, pickTier (see docs/api.md)
+
+# Single-resolution override: sister outputs without editing the spec
+sprout generate specs/demo.json --frame-px 128 --out ./out-128
+
+# Prebaked silhouette mask (black x alpha) alongside the atlas
+sprout generate specs/demo.json --silhouette --out ./out
 ```
+
+`--tiers` and `--frame-px` are mutually exclusive. `--silhouette` also works
+with `batch` and with `--tiers` (one `silhouette.png` per tier).
 
 ### `sprout batch <dir>`
 

@@ -3,6 +3,8 @@
 Usage:
   sprout generate specs/demo.json --out ../demo/assets/procgen
   sprout generate specs/demo.json --png-mode png8 --texturepacker --mipmaps
+  sprout generate specs/demo.json --tiers 64,128,256 --out ./tiers
+  sprout generate specs/demo.json --frame-px 128 --silhouette
   sprout batch specs/ --out ../demo/assets/procgen
   sprout watch specs/ --out ../demo/assets/procgen
   sprout info specs/demo.json [--json]
@@ -27,6 +29,7 @@ from . import __version__
 from . import catalog as catalog_mod
 from .exporter import (
     apply_png_mode,
+    blacken,
     build_autotile_map,
     build_font_map,
     build_manifest,
@@ -35,6 +38,7 @@ from .exporter import (
     build_texturepacker,
     compute_mipmap_meta,
     emit_index_ts,
+    emit_tier_index_ts,
     render_items,
     shader_filename,
     texturepacker_filename,
@@ -56,10 +60,15 @@ PNG_MODES = ("rgba", "png8", "png24")
 def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
               skip_existing: bool, png_mode: str = "rgba",
               texturepacker: bool = False, mipmaps: bool = False,
-              mip_levels: int = 3) -> dict:
+              mip_levels: int = 3, frame_px: int | None = None,
+              silhouette: bool = False) -> dict:
     spec = load_spec(spec_path)
     if seed is not None:
         spec.seed = seed
+    if frame_px is not None:
+        if frame_px < 8 or frame_px > 4096:
+            raise SpecError(f"invalid --frame-px: {frame_px} (8..4096)")
+        spec.layout.frame_px = frame_px
 
     frames = render_items(spec)
     sheet, records = build_sheet(spec, frames)
@@ -69,6 +78,7 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
     manifest_path = out / "manifest.json"
     index_path = out / "index.ts"
     tp_path = out / texturepacker_filename(spec) if texturepacker else None
+    sil_path = out / "silhouette.png" if silhouette else None
 
     autotile_map = build_autotile_map(spec, frames)
     font_map = build_font_map(spec, frames)
@@ -77,12 +87,14 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
     mip_meta = compute_mipmap_meta(sheet, spec, mip_levels) if mipmaps else []
     manifest = build_manifest(spec, records, atlas_name, sheet, str(spec_path),
                               autotile_map, shader_block, font_map,
-                              {"levels": mip_meta} if mip_meta else None)
+                              {"levels": mip_meta} if mip_meta else None,
+                              "silhouette.png" if silhouette else None)
 
     if skip_existing and atlas_path.is_file() and manifest_path.is_file() and index_path.is_file():
         missing_extra = (
             (shader_block and not (shader_path and shader_path.is_file()))
             or (texturepacker and not tp_path.is_file())
+            or (silhouette and not (sil_path and sil_path.is_file()))
             or (mipmaps and not all((out / lvl["file"]).is_file() for lvl in mip_meta))
         )
         if missing_extra:
@@ -101,10 +113,12 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
                     and shader_path.read_bytes() == shader_source.encode())
             )
             if current == fresh and same_manifest and same_shader:
-                return {"spec": spec, "out": out, "atlas": atlas_path, "crc": current,
-                        "skipped": True}
+                return {"spec": spec, "out": out, "atlas": atlas_path,
+                        "crc": current, "skipped": True, "manifest": manifest}
 
     crc = write_png(sheet, atlas_path, png_mode)
+    if sil_path is not None:
+        write_png(blacken(sheet), sil_path, "rgba")
     write_manifest(manifest, manifest_path)
     if shader_source is not None and shader_path is not None:
         shader_path.parent.mkdir(parents=True, exist_ok=True)
@@ -115,7 +129,8 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
         write_texturepacker(tp, tp_path)
     if mipmaps:
         write_mipmap_files(sheet, out, png_mode, mip_meta)
-    return {"spec": spec, "out": out, "atlas": atlas_path, "crc": crc, "skipped": False}
+    return {"spec": spec, "out": out, "atlas": atlas_path, "crc": crc,
+            "skipped": False, "manifest": manifest}
 
 
 STARTER_SPEC = """{
@@ -161,6 +176,17 @@ def init(
     typer.echo("next: see docs/starter-tutorial.md (10-minute Expo walkthrough)")
 
 
+def _parse_tiers(tiers: str) -> list[int]:
+    try:
+        px = sorted({int(p.strip()) for p in tiers.split(",") if p.strip()})
+    except ValueError:
+        px = []
+    if not px or any(p < 8 or p > 4096 for p in px):
+        raise typer.BadParameter(
+            f"invalid --tiers '{tiers}' (comma-separated px, each 8..4096)")
+    return px
+
+
 @app.command()
 def generate(
     spec: Path = typer.Argument(..., help="spec.json to generate"),
@@ -171,14 +197,43 @@ def generate(
     texturepacker: bool = typer.Option(False, "--texturepacker", help="also emit <name>.tpsheet.json (TexturePacker JSON Hash format)"),
     mipmaps: bool = typer.Option(False, "--mipmaps", help="generate a chain of atlas mip levels (@0.5x, @0.25x, ...)"),
     mipmap_levels: int = typer.Option(3, "--mipmap-levels", help="maximum number of mip levels (with --mipmaps)"),
+    frame_px: int = typer.Option(None, "--frame-px", help="override layout.framePx (single-resolution output)"),
+    silhouette: bool = typer.Option(False, "--silhouette", help="also emit silhouette.png (black x alpha) + SILHOUETTE_SOURCE"),
+    tiers: str = typer.Option(None, "--tiers", help="one atlas per px size, e.g. 64,128,256 — subdirs + combined index.ts"),
 ) -> None:
     """Generate spritesheet + manifest.json + index.ts from a spec."""
     if png_mode not in PNG_MODES:
         typer.secho(f"invalid --png-mode '{png_mode}' (available: {', '.join(PNG_MODES)})",
                     fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
+    if tiers and frame_px is not None:
+        typer.secho("--tiers and --frame-px are mutually exclusive",
+                    fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    if tiers:
+        px_list = _parse_tiers(tiers)
+        dest = out if out is not None else spec.parent
+        results: list[tuple[int, dict]] = []
+        try:
+            for px in px_list:
+                r = _generate(spec, dest / str(px), seed, skip_existing,
+                              png_mode, texturepacker, mipmaps, mipmap_levels,
+                              frame_px=px, silhouette=silhouette)
+                results.append((px, r["manifest"]))
+        except SpecError as e:
+            typer.secho(f"error in {spec}: {e}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+        emit_tier_index_ts(dest, results)
+        typer.secho(
+            f"[{spec.stem}] tiers {', '.join(str(p) for p in px_list)} -> "
+            f"{dest.resolve()} (index.ts: atlasSources, pickTier)",
+            fg=typer.colors.GREEN,
+        )
+        return
     try:
-        r = _generate(spec, out, seed, skip_existing, png_mode, texturepacker, mipmaps, mipmap_levels)
+        r = _generate(spec, out, seed, skip_existing, png_mode, texturepacker,
+                      mipmaps, mipmap_levels, frame_px=frame_px,
+                      silhouette=silhouette)
     except SpecError as e:
         typer.secho(f"error in {spec}: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
@@ -205,6 +260,7 @@ def batch(
     texturepacker: bool = typer.Option(False, "--texturepacker", help="also emit <name>.tpsheet.json (TexturePacker JSON Hash format)"),
     mipmaps: bool = typer.Option(False, "--mipmaps", help="generate a chain of atlas mip levels (@0.5x, @0.25x, ...)"),
     mipmap_levels: int = typer.Option(3, "--mipmap-levels", help="maximum number of mip levels (with --mipmaps)"),
+    silhouette: bool = typer.Option(False, "--silhouette", help="also emit silhouette.png (black x alpha) + SILHOUETTE_SOURCE"),
 ) -> None:
     """Generate every spec in a directory (*.json pattern)."""
     if png_mode not in PNG_MODES:
@@ -218,7 +274,8 @@ def batch(
     failed = 0
     for f in files:
         try:
-            _generate(f, out, None, skip_existing, png_mode, texturepacker, mipmaps, mipmap_levels)
+            _generate(f, out, None, skip_existing, png_mode, texturepacker,
+                      mipmaps, mipmap_levels, silhouette=silhouette)
         except SpecError as e:
             typer.secho(f"error in {f}: {e}", fg=typer.colors.RED, err=True)
             failed += 1

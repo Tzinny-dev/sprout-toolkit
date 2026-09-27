@@ -138,6 +138,13 @@ sprout validate specs/catalog.json --coverage catalog.ts --field key --map mappi
 
 # Codegen: catalog file + external mapping.json -> spec
 sprout catalog catalog.ts --field key --map mapping.json --out specs/catalog.json
+
+# Multi-resolution tiers: one atlas per size + combined index.ts (atlasSources, pickTier)
+sprout generate specs/demo.json --tiers 64,128,256 --out ./tiers
+
+# Single-resolution override / prebaked silhouette mask (black x alpha)
+sprout generate specs/demo.json --frame-px 128 --out ./out-128
+sprout generate specs/demo.json --silhouette --out ./out
 ```
 
 ### Export options (`generate` / `batch`)
