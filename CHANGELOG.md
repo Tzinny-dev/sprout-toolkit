@@ -41,8 +41,6 @@ only on-disk delta for consumers is manifests gaining `schemaVersion`
 - **`python3 -m sprout`** entry point (`sprout/__main__.py`) — the module
   invocation the npm bin spawns.
 
-### Added
-
 - **Tier effect shaders (spec `tiers` block)**: named overlay templates
   beyond the FBM terrain shader — `holographic`, `neon`, `legend-glow` and
   the trivial `invisible` (alpha 0). Each entry writes `<name>.<tier>.sksl`
