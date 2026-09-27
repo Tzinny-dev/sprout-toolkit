@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-27
+
+First phased release of the 0.3 line (see §6.3 of the project plan):
+everything below is additive — no existing spec stopped validating. The
+only on-disk delta for consumers is manifests gaining `schemaVersion`
+(and the toolkit version string in generated headers / `meta.generator`).
+
+### Added
+
+- **`sprout import <dir>`**: pack a directory of loose, uniformly-sized
+  PNGs (top-level `*.png`; ids = sorted stems) into atlas + `manifest.json`
+  + `index.ts` — the fallback path for hand-drawn/external art (gesture
+  sprites, scanned sprites) instead of procgen. Errors name the offending
+  frame, id or size mismatch. Tests: `test_import.py` (+8).
+- **npm wrapper (`sprout-toolkit` on npm, `npm/`)**: `npx sprout` spawns
+  `python3 -m sprout` and enforces a **strict version pin** — it refuses
+  to run when the installed CLI version differs from the wrapper's own,
+  printing the exact `pip install "sprout-toolkit==<version>"` command
+  (wrapper nuevo nunca corre con CLI viejo). `SPROUT_PYTHON` points it at
+  another interpreter. `tests/test_fase8.py` asserts the three version
+  sources (pyproject, `sprout.__version__`, npm `package.json`) stay equal.
+- **Manifest `schemaVersion: 1`**: integer schema revision next to
+  `schema: "sprout/manifest@0"` (typed `schemaVersion: number` in the
+  generated `Manifest` interface). Breaking manifest changes bump it;
+  consumers must refuse a revision they don't know instead of misreading
+  fields. Policy documented in `docs/api.md`.
+- **Pipeline CI (`.github/workflows/ci.yml`)**: lints every spec,
+  generates every spec end-to-end, smoke-tests the npm wrapper's version
+  pin, and runs the `validate --coverage` example when a consumer's
+  `catalog.ts` + `mapping.json` sit at the repo root. Unit matrix + wheel
+  smoke stay in `tests.yml`.
+- **`python3 -m sprout`** entry point (`sprout/__main__.py`) — the module
+  invocation the npm bin spawns.
+
 ### Added
 
 - **Tier effect shaders (spec `tiers` block)**: named overlay templates

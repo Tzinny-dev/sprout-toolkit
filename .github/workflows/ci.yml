@@ -1,0 +1,55 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Packaging/asset checks for the toolkit. The unit suite itself runs in
+# tests.yml (Python 3.10-3.13 matrix + wheel smoke); this workflow covers
+# the Fase 8 pipeline: spec lint, end-to-end generation, the npm wrapper's
+# strict version pin, and the catalog coverage check consumers wire up.
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install toolkit (pinned by pyproject)
+        run: python -m pip install -e ".[test]"
+
+      - name: Lint every spec
+        run: |
+          for s in specs/*.json; do
+            sprout lint "$s"
+          done
+
+      - name: Generate every spec end-to-end (atlas + manifest + index.ts + .sksl)
+        run: |
+          out="${RUNNER_TEMP:-/tmp}/sprout-out"
+          for s in specs/*.json; do
+            sprout generate "$s" --out "$out/$(basename "$s" .json)"
+          done
+          test -f "$out/demo/atlas.png"
+          test -f "$out/demo/manifest.json"
+          test -f "$out/demo/index.ts"
+
+      - name: npm wrapper smoke (strict version pin)
+        run: node npm/bin/sprout.js --version
+
+      # Coverage example for consumers: wire your own catalog + mapping
+      # (see docs/cli.md). Fails the build when a catalog id has no frame.
+      - name: Catalog coverage (example, runs when files are present)
+        run: |
+          if [ -f catalog.ts ] && [ -f mapping.json ]; then
+            sprout catalog catalog.ts --field key \
+              --map mapping.json --out specs/catalog.json
+            sprout validate specs/catalog.json \
+              --coverage catalog.ts --field key --map mapping.json
+          else
+            echo "no catalog.ts + mapping.json at the repo root — skipping"
+          fi

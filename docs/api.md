@@ -14,6 +14,7 @@ documents the contract of the two machine-readable ones.
 ```json
 {
   "schema": "sprout/manifest@0",
+  "schemaVersion": 1,
   "name": "starter_atlas",
   "seed": 7,
   "kind": "atlas",
@@ -27,7 +28,7 @@ documents the contract of the two machine-readable ones.
   "tiles": { "ids": [] },
   "meta": {
     "provenance": { "spec": "starter.json", "git": "" },
-    "generator": { "name": "sprout", "version": "0.2.1" }
+    "generator": { "name": "sprout", "version": "0.3.0" }
   }
 }
 ```
@@ -35,6 +36,9 @@ documents the contract of the two machine-readable ones.
 - **`frames[]`** — `id` is `<item>_<index>` (`hero_00`, `hero_01`, …).
   `anchor` appears **only on `props` frames** (ground-contact point in local
   frame pixels, from the real alpha bbox).
+- **`schemaVersion`** — integer manifest-schema revision. Bumped only on
+  breaking changes (policy in the CHANGELOG); a consumer seeing a higher
+  value than it knows must refuse the file rather than misread fields.
 - **`anim`** — resolved frame-id lists per animation.
 - **`tiles.ids`** — frame ids of `terrain` items (for tilemap rendering).
 - **`meta.generator`** — which toolkit version produced the file: handy when
@@ -55,7 +59,7 @@ documents the contract of the two machine-readable ones.
 interface Frame { id; col; row; x; y; w; h; anchor?: { x; y } }
 interface Anim  { frames: string[]; fps: number; loop: boolean }
 interface SpriteSpec { id: string; x: number; y: number; scale?: number }
-interface Manifest { schema; name; seed; …; tint?: TintBlock; meta: ManifestMeta }
+interface Manifest { schema; schemaVersion: number; name; seed; …; tint?: TintBlock; meta: ManifestMeta }
 interface ManifestMeta { provenance; generator: GeneratorMeta }
 type TintMode = 'shade' | 'full';
 interface TintColor { key: string; hex: string }

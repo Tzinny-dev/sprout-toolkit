@@ -152,6 +152,8 @@ def build_manifest(spec: Spec, records: list[dict], atlas_name: str,
         }
     return {
         "schema": "sprout/manifest@0",
+        # Bump only on breaking manifest changes (policy: CHANGELOG §6.3).
+        "schemaVersion": 1,
         "name": spec.name,
         "seed": spec.seed,
         "kind": "atlas",
@@ -646,6 +648,7 @@ export interface ManifestMeta {{
 
 export interface Manifest {{
   schema: string;
+  schemaVersion: number;
   name: string;
   seed: number;
   kind: string;

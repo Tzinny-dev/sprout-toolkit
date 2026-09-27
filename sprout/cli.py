@@ -49,7 +49,7 @@ from .exporter import (
     write_texturepacker,
 )
 from .generators.base import FrameData
-from .spec import Spec, SpecError, load_spec
+from .spec import Layout, Spec, SpecError, load_spec
 
 app = typer.Typer(add_completion=False, no_args_is_help=True,
                   help="sprout — deterministic procedural 2D assets for Expo + react-native-skia.")
@@ -718,6 +718,90 @@ def watch(
             time.sleep(interval)
     except KeyboardInterrupt:
         typer.secho("\n[watch] stopped.", fg=typer.colors.CYAN)
+
+
+@app.command("import")
+def import_cmd(
+    src: Path = typer.Argument(..., help="directory of loose PNG frames (top-level *.png, uniform size)"),
+    out: Path = typer.Option(..., "--out", "-o", help="output directory (atlas + manifest + index.ts)"),
+    name: str = typer.Option(None, "--name", help="atlas name (default: <dir>_atlas)"),
+    seed: int = typer.Option(0, "--seed", help="manifest seed (informational)"),
+    cols: int = typer.Option(8, "--cols", help="spritesheet grid columns"),
+) -> None:
+    """Pack a directory of loose PNGs into atlas + manifest + index.ts."""
+    if not src.is_dir():
+        typer.secho(f"not a directory: {src}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    if cols < 1 or cols > 512:
+        typer.secho(f"invalid --cols: {cols} (1..512)", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    files = sorted(src.glob("*.png"))
+    if not files:
+        typer.secho(f"no *.png frames found in {src}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+    from PIL import Image, UnidentifiedImageError
+
+    sizes: set[tuple[int, int]] = set()
+    images: list[tuple[str, Image.Image]] = []
+    for f in files:
+        stem = f.stem
+        if not stem or not stem.replace("_", "").replace("-", "").isalnum():
+            typer.secho(
+                f"invalid frame id '{stem}' (alphanumeric, '_' and '-' only)",
+                fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+        try:
+            img = Image.open(f).convert("RGBA")
+            img.load()
+        except (UnidentifiedImageError, OSError) as e:
+            typer.secho(f"unreadable PNG {f.name}: {e}",
+                        fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+        sizes.add(img.size)
+        images.append((stem, img))
+
+    if len(sizes) > 1:
+        found = ", ".join(f"{w}x{h}" for w, h in sorted(sizes))
+        typer.secho(
+            f"frames must all share one size (found: {found})",
+            fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+    frame_w, frame_h = sizes.pop()
+    safe = "".join(c if c.isalnum() or c in "_-" else "_" for c in src.name)
+    spec_name = name or f"{safe}_atlas"
+    if not spec_name.replace("_", "").replace("-", "").isalnum():
+        typer.secho(f"invalid --name '{spec_name}' (alphanumeric, '_' and '-' only)",
+                    fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+    cols_used = min(cols, len(images))
+    rows = -(-len(images) // cols_used)
+    sheet = Image.new("RGBA", (cols_used * frame_w, rows * frame_h), (0, 0, 0, 0))
+    records: list[dict] = []
+    for i, (stem, img) in enumerate(images):
+        col, row = i % cols_used, i // cols_used
+        x, y = col * frame_w, row * frame_h
+        sheet.paste(img, (x, y), img)
+        records.append({"id": stem, "col": col, "row": row,
+                        "x": x, "y": y, "w": frame_w, "h": frame_h})
+
+    spec = Spec(
+        name=spec_name, seed=seed, items=[], animations={},
+        layout=Layout(frame_px=frame_w, cols=cols_used,
+                      tile_logical=frame_w, sample="nearest"),
+        files_atlas="atlas.png",
+    )
+    manifest = build_manifest(spec, records, "atlas.png", sheet, str(src))
+    write_png(sheet, out / "atlas.png", "rgba")
+    write_manifest(manifest, out / "manifest.json")
+    emit_index_ts(manifest, out / "index.ts")
+    typer.secho(
+        f"[{spec_name}] {len(records)} frames ({frame_w}x{frame_h}) -> "
+        f"{out.resolve()}",
+        fg=typer.colors.GREEN,
+    )
 
 
 @app.callback(invoke_without_command=True)

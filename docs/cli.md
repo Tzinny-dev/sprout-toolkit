@@ -141,6 +141,24 @@ error. `--generator` is the fallback when no `--map` is given.
 `--set-field` selects the record field carrying the set name
 (default `set`). Item ids are always the extracted field values.
 
+### `sprout import <dir>`
+
+Pack a directory of loose PNG frames (top-level `*.png` only) into an
+atlas + manifest + `index.ts` — the fallback path for hand-drawn or
+external art (gesture sprites, scanned art) instead of procgen.
+
+```bash
+sprout import ./frames/ --out ./assets/gestures --cols 2
+sprout import ./frames/ -o ./out --name my_atlas --seed 7
+```
+
+- Frames must all share **one size** (the error lists what it found).
+- Frame ids are the file stems, sorted alphabetically; ids may contain
+  `A-Z a-z 0-9 _ -` only. Non-PNG files are ignored, broken PNGs fail.
+- `--cols` (default 8) is the sheet grid width; the sheet grows by rows.
+- `--name` defaults to `<dir>_atlas`; `--seed` is informational (recorded
+  in the manifest, no RNG involved).
+
 ## Export options (`generate` / `batch`)
 
 ```bash

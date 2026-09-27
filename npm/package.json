@@ -1,0 +1,38 @@
+{
+  "name": "sprout-toolkit",
+  "version": "0.3.0",
+  "description": "Deterministic procedural 2D asset generation for Expo + react-native-skia — Python CLI wrapper",
+  "bin": {
+    "sprout": "bin/sprout.js"
+  },
+  "files": [
+    "bin",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Tzinny-dev/sprout-toolkit.git",
+    "directory": "npm"
+  },
+  "bugs": {
+    "url": "https://github.com/Tzinny-dev/sprout-toolkit/issues"
+  },
+  "homepage": "https://github.com/Tzinny-dev/sprout-toolkit#readme",
+  "keywords": [
+    "procgen",
+    "sprites",
+    "spritesheet",
+    "skia",
+    "expo",
+    "react-native",
+    "pixel-art",
+    "game-dev"
+  ],
+  "scripts": {
+    "test": "node bin/sprout.js --version"
+  }
+}

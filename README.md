@@ -2,6 +2,7 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/sprout-toolkit)](https://pypi.org/project/sprout-toolkit/)
 [![CI](https://github.com/Tzinny-dev/sprout-toolkit/actions/workflows/tests.yml/badge.svg)](https://github.com/Tzinny-dev/sprout-toolkit/actions/workflows/tests.yml)
+[![Pipeline](https://github.com/Tzinny-dev/sprout-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/Tzinny-dev/sprout-toolkit/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 
@@ -15,6 +16,10 @@ It generates atlases, tilemaps, autotiles, bitmap fonts and SkSL shaders from JS
 
 ![Hero blob walk cycle](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/hero_walk.gif)
 ![Spark burst](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/spark.gif)
+![Critter roster](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/critter.png)
+![Flora roster](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/flora.png)
+![Face moods](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/face.png)
+![Object grammar](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/objects.png)
 
 ---
 
@@ -24,22 +29,32 @@ It generates atlases, tilemaps, autotiles, bitmap fonts and SkSL shaders from JS
 sprout/
 ├── sprout/                     # Python package
 │   ├── __init__.py             #   __version__
-│   ├── cli.py                  #   CLI (Typer): generate, batch, watch, info, lint, diff, validate
-│   ├── exporter.py             #   Spritesheet packing, manifest.json, index.ts
+│   ├── __main__.py             #   `python -m sprout` entry point (npm bin target)
+│   ├── cli.py                  #   CLI (Typer): generate, batch, watch, info, lint, diff, validate, catalog, import
+│   ├── exporter.py             #   Spritesheet packing, manifest.json, index.ts (+ tiers/silhouette)
 │   ├── spec.py                 #   Load/validate JSON specs (schema v0)
+│   ├── catalog.py              #   Catalog file -> spec codegen (external mapping)
+│   ├── palettes.py             #   Named palettes + outline rule
 │   ├── autotile.py             #   8-bit masks, 16/47 lookup
-│   ├── sksl.py                 #   Runtime SkSL shaders (FBM value-noise)
+│   ├── sksl.py                 #   Runtime SkSL shaders (FBM + tier templates)
 │   ├── assets/fonts/           #   Bundled font (ships in the wheel)
 │   └── generators/             #   Generation plugins
 │       ├── base.py             #     FrameData + Generator (contract)
 │       ├── terrain.py          #     Seamless tiles + autotile
-│       ├── props.py            #     Static objects (5 kinds, anchor points)
+│       ├── props.py            #     Static objects (12 kinds incl. v3 grammar, anchors)
 │       ├── particles.py        #     Animated bursts with easing
-│       ├── ui.py                #     Button, slider, 9-patch panel
-│       ├── font.py              #     Bitmap font from TTF (one glyph per frame)
-│       └── blob_walk.py        #     8-frame walk cycle
+│       ├── ui.py               #     Button, slider, 9-patch panel
+│       ├── font.py             #     Bitmap font from TTF (one glyph per frame)
+│       ├── blob_walk.py        #     8-frame walk cycle
+│       ├── critter.py          #     5 archetypes with composable parts
+│       ├── flora.py            #     Canopies + undergrowth, sway anim
+│       └── face.py             #     16 moods with blink
 ├── specs/                      # Example specs (one per generator)
-├── tests/                      # 142 tests (determinism, autotile, SkSL, generators, CLI)
+├── tests/                      # 420 tests (determinism, generators, CLI, catalog, tiers)
+├── docs/                       # spec.md, cli.md, api.md, generators.md + showcase/
+├── npm/                        # npm wrapper (`npx sprout`, strict version pin)
+├── site/                       # Landing page (GitHub Pages)
+├── .github/workflows/          # tests.yml (matrix + wheel), ci.yml (pipeline), publish.yml, pages.yml
 ├── LICENSE                     # MIT
 └── pyproject.toml
 ```
@@ -54,6 +69,8 @@ sprout/
 | **Runtime SkSL shaders** | Generated Skia shaders (FBM value-noise, tileable), no bundle weight added. |
 | **Spec introspection** | `sprout info`/`sprout lint`/`sprout diff` to inspect, validate quality, and compare builds. |
 | **Catalog codegen** | `sprout catalog` + `validate --coverage`: specs from any catalog file via an external `mapping.json`. |
+| **Loose PNG import** | `sprout import`: pack hand-drawn/external frames into an atlas + manifest + `index.ts`. |
+| **npm wrapper** | `npx sprout` (Node ≥18) spawning the Python CLI with a strict version pin. |
 | **Flexible export** | PNG8/PNG24, TexturePacker format, atlas mipmaps — all opt-in. |
 
 ## Showcase
@@ -74,6 +91,26 @@ Everything below is generated from JSON specs — same seed, same pixels, every 
 
 `props` — 5 kinds × deterministic variants, each frame with an anchor point
 (`specs/props.json`).
+
+![Critter roster: 5 archetypes](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/critter.png)
+
+`critter` — 5 archetypes (quadruped, bird, fish, reptile, bug) with
+composable parts + idle frames ([`critter_idle.gif`](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/critter_idle.gif))
+(`specs/critter.json`).
+
+![Flora roster](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/flora.png)
+
+`flora` — canopies with sway ([`flora_sway.gif`](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/flora_sway.gif))
+(`specs/flora.json`).
+
+![Face moods](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/face.png)
+
+`face` — 16 moods with blink (`specs/face.json`).
+
+![Object grammar: 7 families, 27 forms](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/objects.png)
+
+`props` v3 object grammar — 7 families × 27 forms for flavors + things
+(`specs/objects.json`).
 
 ![UI atlas: button states, sliders, 9-patch panels](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/ui.png)
 
@@ -96,6 +133,20 @@ pip install -e ".[test]"
 ```
 
 The installed command is `sprout` (not `sprout-toolkit` — that's just the PyPI distribution name).
+
+### npm wrapper (`npx sprout`)
+
+```bash
+npm install --save-dev sprout-toolkit
+python3 -m pip install "sprout-toolkit==0.3.0"   # pinned CLI for the wrapper
+npx sprout --version
+```
+
+The `sprout` bin ([`npm/bin/sprout.js`](npm/bin/sprout.js)) spawns
+`python3 -m sprout` and refuses to run when the installed CLI version
+differs from the wrapper's own — both channels release in lockstep (see
+[CHANGELOG](CHANGELOG.md)). Point it at a non-default interpreter with
+`SPROUT_PYTHON=/path/to/python3`.
 
 ## Quick start
 
@@ -138,6 +189,9 @@ sprout validate specs/catalog.json --coverage catalog.ts --field key --map mappi
 
 # Codegen: catalog file + external mapping.json -> spec
 sprout catalog catalog.ts --field key --map mapping.json --out specs/catalog.json
+
+# Pack loose PNG frames (hand-drawn/external art) into an atlas + manifest
+sprout import ./frames/ --out ./assets/gestures --cols 2
 
 # Multi-resolution tiers: one atlas per size + combined index.ts (atlasSources, pickTier)
 sprout generate specs/demo.json --tiers 64,128,256 --out ./tiers
@@ -202,22 +256,24 @@ pytest -q
 ```
 
 CI (`.github/workflows/tests.yml`) runs the full suite on every push/PR,
-across Python 3.10–3.13.
-Publishing to PyPI is manual (`.github/workflows/publish.yml`, trusted
-publishing via OIDC) — see [CHANGELOG](CHANGELOG.md).
-
-## Releasing / Emergency Rollback
-
-CI (`.github/workflows/tests.yml`) runs the full suite on every push/PR,
-across Python 3.10–3.13, and includes a wheel smoke test (build, install in a
-clean venv, `sprout --version`). Publishing to PyPI is manual
+across Python 3.10–3.13; `.github/workflows/ci.yml` runs the pipeline
+checks (spec lint, end-to-end generation, npm wrapper version pin, and the
+catalog coverage example). Publishing to PyPI is manual
 (`.github/workflows/publish.yml`, trusted publishing via OIDC) — see
 [CHANGELOG](CHANGELOG.md).
 
+## Releasing / Emergency Rollback
+
+CI runs on every push/PR: `tests.yml` (Python 3.10–3.13 matrix + wheel
+smoke test) and `ci.yml` (spec lint, generation, npm pin). Publishing to
+PyPI is manual (`.github/workflows/publish.yml`, trusted publishing via
+OIDC) — see [CHANGELOG](CHANGELOG.md).
+
 ### Releasing (P1 checklist)
 
-1. Bump `version` in `pyproject.toml` **and** `sprout/__init__.py` (kept in
-   sync by the `check-version` job in `publish.yml`).
+1. Bump `version` in `pyproject.toml`, `sprout/__init__.py` **and**
+   `npm/package.json` (all three are asserted equal by `tests/test_fase8.py`;
+   `publish.yml`'s `check-version` job also verifies the first two).
 2. Add a `## [<version>]` section to `CHANGELOG.md` under `[Unreleased]`.
 3. Tag and push: `git tag v<version> && git push origin v<version>` **is not
    enough on its own** — the `publish` workflow is `workflow_dispatch` only
@@ -225,6 +281,8 @@ clean venv, `sprout --version`). Publishing to PyPI is manual
    pass the exact version string.
 4. Add a GitHub Release (auto-drafting from the tag is fine) with the
    `CHANGELOG` section as notes.
+5. Publish the npm wrapper from `npm/` (`npm publish`) with the **same**
+   version — the wrapper pins the CLI exactly.
 
 ### Emergency rollback
 
