@@ -306,11 +306,13 @@ def info(
 
 
 PADDING_WARN_RATIO = 0.25
+DEFAULT_MAX_ATLAS_MB = 16.0
 
 
-def _lint_warnings(spec: Spec, items_frames: list[list[FrameData]]) -> list[dict]:
-    """Quality warnings for an already-rendered spec: atlas padding (unused
-    grid cells) and completely transparent frames."""
+def _lint_warnings(spec: Spec, items_frames: list[list[FrameData]],
+                   max_atlas_bytes: int = int(DEFAULT_MAX_ATLAS_MB * (1 << 20))) -> list[dict]:
+    """Quality warnings for an already-rendered spec: atlas padding,
+    completely transparent frames and atlas size vs. the bundle budget."""
     warnings: list[dict] = []
 
     cols = spec.layout.cols
@@ -322,6 +324,19 @@ def _lint_warnings(spec: Spec, items_frames: list[list[FrameData]]) -> list[dict
             "check": "padding",
             "message": f"{unused}/{capacity} unused atlas cells ({unused / capacity:.0%})",
         })
+
+    if max_atlas_bytes > 0:
+        atlas_bytes = capacity * spec.layout.frame_px * spec.layout.frame_px * 4
+        if atlas_bytes > max_atlas_bytes:
+            warnings.append({
+                "check": "atlas_size",
+                "message": (
+                    f"atlas is {atlas_bytes / (1 << 20):.1f} MB uncompressed (RGBA) "
+                    f"over the {max_atlas_bytes / (1 << 20):.0f} MB budget — "
+                    f"consider --png-mode png8 or a lower layout.framePx"
+                ),
+                "bytes": atlas_bytes,
+            })
 
     empty_ids = [
         fr.id
@@ -348,8 +363,11 @@ def _lint_warnings(spec: Spec, items_frames: list[list[FrameData]]) -> list[dict
 def lint(
     spec: Path = typer.Argument(..., help="spec.json to analyze"),
     as_json: bool = typer.Option(False, "--json", help="machine-readable output"),
+    max_atlas_mb: float = typer.Option(
+        DEFAULT_MAX_ATLAS_MB, "--max-atlas-mb",
+        help="warn when the atlas exceeds this uncompressed RGBA budget in MB (0 disables)"),
 ) -> None:
-    """Analyze a spec: atlas padding and empty frames (renders to verify)."""
+    """Analyze a spec: atlas padding, empty frames and size budget (renders to verify)."""
     try:
         s = load_spec(spec)
         items_frames = render_items(s)
@@ -357,7 +375,7 @@ def lint(
         typer.secho(f"invalid: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
-    warnings = _lint_warnings(s, items_frames)
+    warnings = _lint_warnings(s, items_frames, int(max_atlas_mb * (1 << 20)))
     if as_json:
         typer.echo(json.dumps({"spec": str(spec), "warnings": warnings}, indent=2))
     elif not warnings:
@@ -378,6 +396,11 @@ def _diff_specs(a: Spec, b: Spec) -> list[dict]:
         if av != bv:
             diffs.append({"field": field, "a": av, "b": bv})
 
+    a_colors = [(c.key, c.hex) for c in a.colors]
+    b_colors = [(c.key, c.hex) for c in b.colors]
+    if a_colors != b_colors:
+        diffs.append({"field": "colors", "a": a_colors, "b": b_colors})
+
     for f in ("frame_px", "cols", "tile_logical", "sample"):
         av, bv = getattr(a.layout, f), getattr(b.layout, f)
         if av != bv:
@@ -391,11 +414,14 @@ def _diff_specs(a: Spec, b: Spec) -> list[dict]:
         diffs.append({"field": f"items.{iid}", "a": "removed", "b": None})
     for iid in sorted(set(a_items) & set(b_items)):
         ia, ib = a_items[iid], b_items[iid]
-        if (ia.generator, ia.frames, ia.params) != (ib.generator, ib.frames, ib.params):
+        if ((ia.generator, ia.frames, ia.params, ia.tint)
+                != (ib.generator, ib.frames, ib.params, ib.tint)):
             diffs.append({
                 "field": f"items.{iid}",
-                "a": {"generator": ia.generator, "frames": ia.frames, "params": ia.params},
-                "b": {"generator": ib.generator, "frames": ib.frames, "params": ib.params},
+                "a": {"generator": ia.generator, "frames": ia.frames,
+                      "params": ia.params, "tint": ia.tint},
+                "b": {"generator": ib.generator, "frames": ib.frames,
+                      "params": ib.params, "tint": ib.tint},
             })
 
     a_anim, b_anim = a.animations, b.animations
@@ -452,7 +478,7 @@ def _diff_outputs(a: Path, b: Path) -> list[dict]:
     if ids_a - ids_b:
         diffs.append({"field": "frames.removed", "a": sorted(ids_a - ids_b), "b": None})
 
-    for block in ("autotile", "shader", "font"):
+    for block in ("autotile", "shader", "font", "tint"):
         if (block in man_a) != (block in man_b):
             diffs.append({"field": f"{block}.present", "a": block in man_a, "b": block in man_b})
 

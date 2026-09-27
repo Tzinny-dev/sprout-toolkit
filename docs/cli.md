@@ -58,12 +58,14 @@ sprout info --json specs/particles.json
 
 ### `sprout lint <spec>`
 
-Quality analysis: atlas padding waste and empty frames. Use `--json` as a CI
-gate.
+Quality analysis: atlas padding waste, empty frames, and bundle budget —
+the atlas must stay under `--max-atlas-mb` (default 16 MB uncompressed RGBA;
+`0` disables). Use `--json` as a CI gate.
 
 ```bash
 sprout lint specs/ui.json
 sprout lint --json specs/ui.json
+sprout lint --max-atlas-mb 8 specs/tint.json
 ```
 
 ### `sprout diff <a> <b>`

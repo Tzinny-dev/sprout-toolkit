@@ -1,0 +1,18 @@
+{
+  "name": "tint_atlas",
+  "seed": 4242,
+  "target": "expo-rn-skia",
+  "files": { "atlas": "atlas.png" },
+  "layout": { "framePx": 64, "cols": 4, "tileLogical": 32, "sample": "nearest" },
+  "colors": [
+    { "key": "ember", "hex": "#E4572E" },
+    { "key": "azure", "hex": "#3E8FD0" },
+    { "key": "moss",  "hex": "#5E984E" }
+  ],
+  "items": [
+    { "id": "hero", "generator": "blob_walk", "frames": 4, "tint": "shade" },
+    { "id": "rock", "generator": "props", "frames": 4, "params": { "kind": "rock", "palette": "earth" } },
+    { "id": "tiles", "generator": "terrain", "frames": 4 }
+  ],
+  "animations": { "walk": { "frames": "hero", "fps": 8, "loop": true } }
+}

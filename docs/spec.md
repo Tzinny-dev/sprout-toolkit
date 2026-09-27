@@ -48,6 +48,46 @@ fails `sprout validate` / `generate` with a descriptive error.
 | `frames` | `1` | `> 0` |
 | `params` | `{}` | generator-specific — see [Generators](/docs/generators) |
 | `autotile` | `null` | `16` \| `47`; only for `terrain`; requires `frames` == variant count |
+| `tint` | `none` | `none` \| `shade` \| `full` — declares the item as tintable (see [Runtime tint](#runtime-tint-optional)) |
+
+## Runtime tint (optional)
+
+Color variants are **not** baked into the atlas: the item is generated once
+in a tint-ready palette and recolored at runtime with `colorMatrixFor` /
+`tintColors` (exported by `index.ts`). One sprite + N runtime colors instead
+of N baked copies.
+
+```json
+{
+  "colors": [
+    { "key": "ember", "hex": "#E4572E" },
+    { "key": "azure", "hex": "#3E8FD0" }
+  ],
+  "items": [
+    { "id": "hero", "generator": "blob_walk", "frames": 4, "tint": "shade" }
+  ]
+}
+```
+
+| field | default | rules |
+|---|---|---|
+| `colors` | `[]` | list of `{ "key", "hex" }`; `key` unique; `hex` is `#RGB`/`#RRGGBB` (normalized to `#RRGGBB`) |
+| item `tint` | `none` | `none` = colors are baked; `shade` = tint preserves luminance (correct on colored art); `full` = pure multiply (identical to `shade` on neutral/tint-ready art) |
+
+`sprout lint` reports the uncompressed atlas size against a budget
+(`--max-atlas-mb`, default 16 MB) — tinted specs stay at one copy of the art.
+
+## Palettes (optional)
+
+`params.palette` fills in any color role (`fill`, `accent`, `outline`) the
+item did not set explicitly — explicit `params.fill`/`outline` always win:
+
+```json
+{ "id": "rock", "generator": "props", "params": { "kind": "rock", "palette": "earth" } }
+```
+
+Built-in palettes: `earth`, `forest`, `ocean`, `candy`. The outline rule is
+`outline = darken(fill, 0.55)`, so every palette stays consistent.
 
 ## Animations
 
@@ -84,6 +124,7 @@ manifest). Accepts `false` (default), `true` (defaults), or an object:
 |---|---|---|
 | `target` | `expo-rn-skia` | emit target marker (informational) |
 | `files.atlas` | `<name>_atlas.png` | output PNG filename |
+| `colors` | `[]` | runtime tint palette (see [Runtime tint](#runtime-tint-optional)) |
 | `layout` / `animations` / `runtime` | see above | optional blocks |
 
 ## Full example
@@ -95,9 +136,11 @@ manifest). Accepts `false` (default), `true` (defaults), or an object:
   "target": "expo-rn-skia",
   "files": { "atlas": "atlas.png" },
   "layout": { "framePx": 64, "cols": 4, "tileLogical": 32, "sample": "nearest" },
+  "colors": [ { "key": "ember", "hex": "#E4572E" } ],
   "items": [
-    { "id": "hero",  "generator": "blob_walk", "frames": 8 },
-    { "id": "coin",  "generator": "props", "frames": 4, "params": { "kind": "flower" } }
+    { "id": "hero",  "generator": "blob_walk", "frames": 8, "tint": "shade" },
+    { "id": "coin",  "generator": "props", "frames": 4,
+      "params": { "kind": "flower", "palette": "candy" } }
   ],
   "animations": { "walk": { "frames": "hero", "fps": 8, "loop": true } },
   "runtime": false

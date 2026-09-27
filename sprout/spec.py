@@ -7,8 +7,9 @@ Example:
   "target": "expo-rn-skia",
   "files": { "atlas": "atlas.png" },          // optional; default "<name>_atlas.png"
   "layout": { "framePx": 64, "cols": 4, "tileLogical": 32, "sample": "nearest" },
+  "colors": [ { "key": "ember", "hex": "#E4572E" } ],   // optional tint palette
   "items": [
-    { "id": "hero",  "generator": "blob_walk", "frames": 8 },
+    { "id": "hero",  "generator": "blob_walk", "frames": 8, "tint": "shade" },
     { "id": "tiles", "generator": "terrain",  "tiles": 8 }
   ],
   "animations": { "walk": { "frames": "hero", "fps": 8, "loop": true } }
@@ -17,15 +18,20 @@ Example:
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .generators import GENERATORS
-from . import sksl
+from . import palettes, sksl
 
 
 class SpecError(ValueError):
     """Invalid spec."""
+
+
+TINT_MODES = ("none", "shade", "full")
+_HEX_RE = re.compile(r"^[0-9a-fA-F]{3}$|^[0-9a-fA-F]{6}$")
 
 
 @dataclass
@@ -40,12 +46,19 @@ class Layout:
 
 
 @dataclass
+class TintColor:
+    key: str
+    hex: str  # normalized "#RRGGBB"
+
+
+@dataclass
 class Item:
     id: str
     generator: str
     frames: int = 1
     params: dict = field(default_factory=dict)
     autotile: int | None = None
+    tint: str = "none"
 
 
 @dataclass
@@ -65,6 +78,7 @@ class Spec:
     runtime: dict | None = None
     files_atlas: str = ""
     target: str = "expo-rn-skia"
+    colors: list[TintColor] = field(default_factory=list)
 
     @property
     def filename(self) -> str:
@@ -79,6 +93,38 @@ def _expect(d: dict, keys: tuple[str, ...]) -> None:
     for k in keys:
         if k not in d:
             raise SpecError(f"missing field '{k}'")
+
+
+def _normalize_hex(value: object, ctx: str) -> str:
+    """`#RGB`/`#RRGGBB` (or bare digits) -> canonical `#RRGGBB`."""
+    if not isinstance(value, str):
+        raise SpecError(f"{ctx}: hex must be a string, received {value!r}")
+    h = value.strip().lstrip("#")
+    if not _HEX_RE.match(h):
+        raise SpecError(f"{ctx}: invalid hex color {value!r} (expected #RGB or #RRGGBB)")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    return f"#{h.upper()}"
+
+
+def _load_colors(raw: object) -> list[TintColor]:
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise SpecError("'colors' must be a list of {key, hex} objects")
+    out: list[TintColor] = []
+    seen: set[str] = set()
+    for i, entry in enumerate(raw):
+        if not isinstance(entry, dict) or "key" not in entry or "hex" not in entry:
+            raise SpecError(f"colors[{i}]: each entry requires 'key' and 'hex'")
+        key = entry["key"]
+        if not isinstance(key, str) or not key:
+            raise SpecError(f"colors[{i}]: key must be a non-empty string")
+        if key in seen:
+            raise SpecError(f"duplicate color key: '{key}'")
+        seen.add(key)
+        out.append(TintColor(key=key, hex=_normalize_hex(entry["hex"], f"colors[{i}]")))
+    return out
 
 
 def load_spec(path: Path) -> Spec:
@@ -115,6 +161,8 @@ def load_spec(path: Path) -> Spec:
         raise SpecError(f"invalid layout.sample: {layout.sample!r} (nearest|linear)")
     if layout.cols <= 0:
         raise SpecError("layout.cols must be > 0 (defines the spritesheet grid)")
+
+    colors = _load_colors(raw.get("colors"))
 
     items: list[Item] = []
     seen: set[str] = set()
@@ -156,8 +204,23 @@ def load_spec(path: Path) -> Spec:
         it_params = dict(it.get("params", {}) or {})
         if autotile is not None:
             it_params["autotile"] = autotile
+        try:
+            palettes.resolve_params(it_params)
+        except KeyError as e:
+            raise SpecError(
+                f"item '{it_id}': unknown palette {e.args[0]!r} "
+                f"(available: {', '.join(sorted(palettes.PALETTES))})"
+            ) from e
+
+        tint = str(it.get("tint", "none"))
+        if tint not in TINT_MODES:
+            raise SpecError(
+                f"item '{it_id}': invalid tint {tint!r} "
+                f"({' | '.join(TINT_MODES)})"
+            )
+
         items.append(Item(id=it_id, generator=gen, frames=n,
-                          params=it_params, autotile=autotile))
+                          params=it_params, autotile=autotile, tint=tint))
 
     animations: dict[str, Anim] = {}
     for name_a, a in (raw.get("animations", {}) or {}).items():
@@ -190,4 +253,5 @@ def load_spec(path: Path) -> Spec:
         runtime=runtime,
         files_atlas=files_atlas,
         target=str(raw.get("target", "expo-rn-skia")),
+        colors=colors,
     )

@@ -44,6 +44,8 @@ documents the contract of the two machine-readable ones.
   - `shader` — `{ file, uniforms }` when `runtime` is on
   - `font` — `{ items: { <id>: { ascent, descent, glyphs: { char: {id, advance} } } } }`
   - `mipmaps` — `{ levels: [{scale, file, w, h}] }` with `--mipmaps`
+  - `tint` — `{ colors: [{key, hex}], items: { <id>: 'shade' | 'full' } }`
+    when the spec declares `colors` or a tinted item
 
 ## `index.ts` exports
 
@@ -53,8 +55,11 @@ documents the contract of the two machine-readable ones.
 interface Frame { id; col; row; x; y; w; h; anchor?: { x; y } }
 interface Anim  { frames: string[]; fps: number; loop: boolean }
 interface SpriteSpec { id: string; x: number; y: number; scale?: number }
-interface Manifest { schema; name; seed; …; meta: ManifestMeta }
+interface Manifest { schema; name; seed; …; tint?: TintBlock; meta: ManifestMeta }
 interface ManifestMeta { provenance; generator: GeneratorMeta }
+type TintMode = 'shade' | 'full';
+interface TintColor { key: string; hex: string }
+interface TintBlock { colors: TintColor[]; items: Record<string, TintMode> }
 ```
 
 ### Constants
@@ -69,6 +74,9 @@ interface ManifestMeta { provenance; generator: GeneratorMeta }
 | `GENERATOR` | `{ name, version }` of the producing toolkit |
 | `sampleMode`, `atlasSampling` | Skia filter mode from `units.sample` |
 | `SHADER_SKS`, `SHADER_DEFAULTS` | SkSL source + default uniforms (`null` when runtime off) |
+| `TINTS` | `Record<key, '#RRGGBB'>` from the spec's `colors` (empty without a tint block) |
+| `TINT_MODES` | `Record<itemId, TintMode>` for tinted items |
+| `SILHOUETTE_MATRIX` | 4×5 color matrix: black × original alpha |
 
 ### Lookup helpers
 
@@ -81,6 +89,41 @@ canonicalMask(mask: number, size: 16 | 47): number
 glyphFrame(char: string, item?): Frame
 textSprites(text, origin, item?, scale?): SpriteSpec[]
 shaderUniforms(time): Record<string, number | number[]>
+```
+
+### Runtime tint helpers
+
+```ts
+tintModeFor(itemId): TintMode | 'none'          // from manifest.tint.items
+hexToRgb(hex): [number, number, number]         // '#RRGGBB' -> 0..1
+colorMatrixFor(hex, mode?): number[]            // 4x5 Skia matrix ('shade' | 'full')
+tintColor(key): SkColor                         // declared tint key -> SkColor
+tintColors(specs, key): SkColor[]               // one color per sprite (same tint)
+silhouetteColors(specs): SkColor[]              // black x alpha, per sprite
+tintPaint(hex, mode?): SkPaint                  // paint with the tint color filter
+silhouettePaint(): SkPaint                      // paint with SILHOUETTE_MATRIX
+```
+
+**Two ways to tint a batch:**
+
+```tsx
+// 1) One color for the whole batch — paint-level color filter.
+//    'shade' keeps the sprite's luminance (correct on colored art).
+const paint = tintPaint(TINTS.ember, 'shade');
+<Atlas paint={paint} image={…} sprites={…} transforms={…} />
+
+// 2) One color per sprite — native colors, modulate (texture x color).
+//    Identical to 'shade' on tint-ready (neutral) art.
+const colors = tintColors(specs, 'ember');
+<Atlas colors={colors} colorBlendMode="modulate"
+       image={…} sprites={…} transforms={…} />
+```
+
+**Hidden items (mode ciego)** — no extra atlas frames:
+
+```tsx
+const colors = silhouetteColors(specs);           // batch path
+// or: const paint = silhouettePaint();            // paint path
 ```
 
 ### Rendering hooks (react-native-skia)

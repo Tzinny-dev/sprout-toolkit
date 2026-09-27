@@ -127,6 +127,13 @@ def build_manifest(spec: Spec, records: list[dict], atlas_name: str,
     for item in spec.items:
         if item.generator == "terrain":
             tile_ids += _frame_ids(item.id, item.frames)
+    tint_items = {it.id: it.tint for it in spec.items if it.tint != "none"}
+    tint_block: dict | None = None
+    if spec.colors or tint_items:
+        tint_block = {
+            "colors": [{"key": c.key, "hex": c.hex} for c in spec.colors],
+            "items": tint_items,
+        }
     return {
         "schema": "sprout/manifest@0",
         "name": spec.name,
@@ -153,6 +160,7 @@ def build_manifest(spec: Spec, records: list[dict], atlas_name: str,
         **({"shader": shader_block} if shader_block else {}),
         **({"font": font_map} if font_map else {}),
         **({"mipmaps": mipmaps_block} if mipmaps_block else {}),
+        **({"tint": tint_block} if tint_block else {}),
     }
 
 
@@ -315,9 +323,117 @@ export function shaderUniforms(time = 0): Record<string, number | number[]> {{
 """
 
 
+def _ts_tint_block() -> str:
+    """Runtime tint helpers (color variants) — see docs/api.md.
+
+    Emitted unconditionally so the API surface is identical across atlases:
+    with a `tint` manifest block the maps are populated; without it they are
+    empty and `tintColor` throws on lookup.
+    """
+    return """
+// --- Runtime tint (color variants) ---
+export type TintMode = 'shade' | 'full';
+
+export interface TintColor { key: string; hex: string }
+export interface TintBlock { colors: TintColor[]; items: Record<string, TintMode> }
+
+export const TINTS: Record<string, string> = Object.fromEntries(
+  (manifest.tint?.colors ?? []).map((c) => [c.key, c.hex]),
+);
+export const TINT_MODES: Record<string, TintMode> = manifest.tint?.items ?? {};
+
+/** Declared tint mode for an item ('none' when the item bakes its colors). */
+export function tintModeFor(itemId: string): TintMode | 'none' {
+  return TINT_MODES[itemId] ?? 'none';
+}
+
+/** '#RGB' | '#RRGGBB' -> [r, g, b] in 0..1 */
+export function hexToRgb(hex: string): [number, number, number] {
+  let h = hex.replace('#', '').trim();
+  if (h.length === 3) h = h.split('').map((c) => c + c).join('');
+  if (h.length !== 6 || /[^0-9a-fA-F]/.test(h)) {
+    throw new Error(`Invalid hex color: ${hex}`);
+  }
+  return [
+    parseInt(h.slice(0, 2), 16) / 255,
+    parseInt(h.slice(2, 4), 16) / 255,
+    parseInt(h.slice(4, 6), 16) / 255,
+  ];
+}
+
+/**
+ * 4x5 row-major Skia color matrix for a tint:
+ * - 'shade': keeps the sprite's Rec.709 luminance and re-hues it
+ *   (correct on colored art; black outlines stay black).
+ * - 'full' : pure per-channel multiply — identical to 'shade' on
+ *   neutral/tint-ready art (gray ramp).
+ */
+export function colorMatrixFor(hex: string, mode: TintMode = 'shade'): number[] {
+  const [r, g, b] = hexToRgb(hex);
+  if (mode === 'full') {
+    return [r, 0, 0, 0, 0, 0, g, 0, 0, 0, 0, 0, b, 0, 0, 0, 0, 0, 1, 0];
+  }
+  const k = [0.2126, 0.7152, 0.0722]; // Rec.709 luminance weights
+  return [
+    k[0] * r, k[1] * r, k[2] * r, 0, 0,
+    k[0] * g, k[1] * g, k[2] * g, 0, 0,
+    k[0] * b, k[1] * b, k[2] * b, 0, 0,
+    0, 0, 0, 1, 0,
+  ];
+}
+
+/** Black x original alpha: the "hidden item" silhouette (mode ciego). */
+export const SILHOUETTE_MATRIX: number[] = [
+  0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0,
+  0, 0, 0, 0, 0,
+  0, 0, 0, 1, 0,
+];
+
+/** SkPaint carrying the tint color filter: <Atlas paint={tintPaint(hex)} />. */
+export function tintPaint(hex: string, mode: TintMode = 'shade'): SkPaint {
+  const paint = Skia.Paint();
+  paint.setColorFilter(Skia.ColorFilter.MakeMatrix(colorMatrixFor(hex, mode)));
+  return paint;
+}
+
+/** SkPaint that flattens every sprite to a black silhouette. */
+export function silhouettePaint(): SkPaint {
+  const paint = Skia.Paint();
+  paint.setColorFilter(Skia.ColorFilter.MakeMatrix(SILHOUETTE_MATRIX));
+  return paint;
+}
+
+/** SkColor for one declared tint key (throws when unknown). */
+export function tintColor(colorKey: string): SkColor {
+  const hex = TINTS[colorKey];
+  if (!hex) throw new Error(`Unknown tint color: ${colorKey}`);
+  return Skia.Color(hex);
+}
+
+/**
+ * Per-sprite colors for
+ * `<Atlas colors={tintColors(specs, key)} colorBlendMode="modulate" />`.
+ * Modulate = texture x color ('full'); on tint-ready (neutral) art that is
+ * indistinguishable from 'shade'. One color per batch -> computed once.
+ */
+export function tintColors(specs: readonly { id: string }[], colorKey: string): SkColor[] {
+  const color = tintColor(colorKey);
+  return specs.map(() => color);
+}
+
+/** Per-sprite colors that turn every sprite into a black silhouette. */
+export function silhouetteColors(specs: readonly { id: string }[]): SkColor[] {
+  const black = Skia.Color('#000000');
+  return specs.map(() => black);
+}
+"""
+
+
 def _ts_source(m: dict) -> str:
     atlas = m["files"]["atlas"]
     shader_block = _ts_shader_block(m)
+    tint_block = _ts_tint_block()
     return f"""// GENERATED by sprout {__version__} — DO NOT EDIT.
 import {{
   FilterMode,
@@ -327,8 +443,10 @@ import {{
   useRSXformBuffer,
 }} from '@shopify/react-native-skia';
 import type {{
+  SkColor,
   SkHostRect,
   SkImage,
+  SkPaint,
   SkPicture,
   SkRSXform,
 }} from '@shopify/react-native-skia';
@@ -432,6 +550,7 @@ export interface Manifest {{
   shader?: ShaderBlock;
   font?: FontBlock;
   mipmaps?: MipmapsBlock;
+  tint?: TintBlock;
   meta: ManifestMeta;
 }}
 
@@ -461,6 +580,7 @@ export const tileFrames: Frame[] = manifest.tiles.ids.map(frameById);
 export const frameScale = manifest.units.tileLogical / manifest.units.framePx;
 export const atlasSampling = {{ filter: sampleMode }};
 
+{tint_block}
 export function rectFor(frameId: string): {{ x: number; y: number; w: number; h: number }} {{
   const f = frameById(frameId);
   // Half-texel inset: avoids bleeding from the atlas' neighboring frame when

@@ -4,6 +4,11 @@ Each spec item selects a generator by name. Params live under
 `item.params`; colors are `[r, g, b]` arrays (0–255). Defaults below are the
 values applied when a param is omitted.
 
+Any generator that takes `fill`/`outline` also accepts
+`"params": { "palette": "earth" }` to fill in unset color roles
+(`earth`, `forest`, `ocean`, `candy`) — explicit params always win.
+See [spec schema](/docs/spec) for `colors` + `tint` (runtime recoloring).
+
 | `generator` | Description | Frames |
 |---|---|---|
 | `terrain` | Seamless noise tiles + 16/47 autotile | any (47 or 16 with `autotile`) |

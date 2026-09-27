@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Runtime tint (color variants)**: specs can declare a `colors` palette
+  (`[{key, hex}]`) and mark items as `tint: shade | full`. The manifest gains
+  a `tint` block and `index.ts` exports `TINTS`, `TINT_MODES`,
+  `colorMatrixFor`, `hexToRgb`, `tintPaint`, `tintColor(s)`,
+  `silhouettePaint/Colors` and `SILHOUETTE_MATRIX` — one sprite per item
+  recolored at runtime (`<Atlas colors>` + `colorBlendMode="modulate"`, or a
+  paint-level `Skia.ColorFilter.MakeMatrix`) instead of baking N copies.
+  Spec: `specs/tint.json`.
+- **Named palettes + outline rule** (`sprout/palettes.py`): `params.palette`
+  (`earth`, `forest`, `ocean`, `candy`) fills unset color roles
+  (`fill`/`accent`/`outline`); explicit `params.fill`/`outline` always win.
+  Outline = `darken(fill, 0.55)`, width = `max(1, framePx // 32)`.
+- `sprout lint --max-atlas-mb` (default 16 MB): warns when the uncompressed
+  RGBA atlas exceeds the bundle budget (`check: atlas_size`, `0` disables).
+- `sprout diff` now compares item `tint` and the spec-level `colors` palette;
+  output-dir diff also covers the `tint` manifest block.
 - `index.ts` now exports a typed `GENERATOR` (`{ name, version }`) plus the
   `ManifestMeta` / `GeneratorMeta` interfaces — `manifest.meta` is typed
   instead of `unknown`. Includes a manifest provenance test.
