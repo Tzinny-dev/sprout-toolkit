@@ -11,7 +11,7 @@
       // site at its root, so the /sprout-toolkit project prefix is stripped.
       // Runs before any asset request: with base '/', the assets on github.io
       // would 404, so redirect first. location.replace avoids history loops.
-      (function () {
+      (() => {
         var PROJECT = '/sprout-toolkit';
         var DOMAIN = 'https://sprout-toolkit.tzinny.com';
         var path = location.pathname;

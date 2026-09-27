@@ -7,8 +7,8 @@ export function DocsIndex() {
       <header className="text-center space-y-3">
         <h1 className="text-3xl font-bold text-white">Documentation</h1>
         <p className="text-slate-400">
-          Everything from your first <code className="text-brand-300">pip install</code> to
-          the manifest/index.ts contract your app consumes.
+          Everything from your first <code className="text-brand-300">pip install</code> to the
+          manifest/index.ts contract your app consumes.
         </p>
       </header>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -18,9 +18,7 @@ export function DocsIndex() {
             to={`/docs/${d.id}`}
             className="group rounded-lg border border-slate-800 bg-slate-900/50 p-5 transition hover:border-brand-700 hover:bg-slate-900"
           >
-            <h2 className="font-medium text-brand-300 group-hover:text-brand-200">
-              {d.title} →
-            </h2>
+            <h2 className="font-medium text-brand-300 group-hover:text-brand-200">{d.title} →</h2>
             <p className="mt-2 text-sm text-slate-400">{d.description}</p>
           </Link>
         ))}

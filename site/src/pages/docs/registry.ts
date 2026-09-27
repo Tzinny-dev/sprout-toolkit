@@ -1,11 +1,12 @@
 // Registry of every document under /docs. Both DocsIndex (cards) and
 // DocPage (render + section nav) read from this single source.
 // Markdown is inlined at build time via Vite's `?raw` imports.
-import quickstart from '../../../../docs/starter-tutorial.md?raw';
+
+import api from '../../../../docs/api.md?raw';
 import cli from '../../../../docs/cli.md?raw';
 import generators from '../../../../docs/generators.md?raw';
 import spec from '../../../../docs/spec.md?raw';
-import api from '../../../../docs/api.md?raw';
+import quickstart from '../../../../docs/starter-tutorial.md?raw';
 
 export interface DocEntry {
   id: string;
@@ -26,7 +27,7 @@ export const DOCS: DocEntry[] = [
     id: 'spec',
     title: 'Spec schema',
     description:
-      'Every field of a spec JSON: name, seed, layout, items, animations, runtime shader.',
+      'Every field of a spec JSON: name, seed, layout, items, animations, runtime shader, tier effects.',
     md: spec,
   },
   {
@@ -40,14 +41,14 @@ export const DOCS: DocEntry[] = [
     id: 'cli',
     title: 'CLI reference',
     description:
-      'All commands (init, generate, batch, watch, info, lint, diff, validate) and export options.',
+      'All commands (init, generate, batch, watch, info, lint, diff, validate, catalog, import) and export options.',
     md: cli,
   },
   {
     id: 'api',
     title: 'Manifest & index.ts API',
     description:
-      'manifest.json contract and the typed exports of the generated index.ts (Atlas hooks, lookup helpers).',
+      'manifest.json contract (schema + schemaVersion) and the typed exports of the generated index.ts (Atlas hooks, lookup helpers).',
     md: api,
   },
 ];

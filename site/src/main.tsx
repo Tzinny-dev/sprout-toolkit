@@ -2,9 +2,9 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import { Home } from './pages/Home';
-import { DocsIndex } from './pages/docs/DocsIndex';
 import { DocPage } from './pages/docs/DocPage';
+import { DocsIndex } from './pages/docs/DocsIndex';
+import { Home } from './pages/Home';
 import './index.css';
 
 const router = createBrowserRouter(

@@ -1,7 +1,7 @@
-import { defineConfig, type Plugin } from 'vite';
-import react from '@vitejs/plugin-react';
 import { copyFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import react from '@vitejs/plugin-react';
+import { defineConfig, type Plugin } from 'vite';
 
 // Copy showcase assets from the sibling `docs/showcase/` directory into the
 // build output so they ship with the site on GitHub Pages.

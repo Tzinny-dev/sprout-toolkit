@@ -12,6 +12,7 @@ export const Logo: FC<{ className?: string }> = ({ className }) => (
     strokeLinejoin="round"
     className={className}
   >
+    <title>sprout-toolkit</title>
     <line x1="12" y1="5" x2="12" y2="12" />
     <path d="M12 5a5 5 0 0 0 0 10" />
     <path d="M12 12A5 5 0 0 1 17 12a5 5 0 0 1 0 10" />

@@ -1,5 +1,4 @@
-import type { ReactNode } from 'react';
-import { Link, Outlet, NavLink } from 'react-router-dom';
+import { Link, NavLink, Outlet } from 'react-router-dom';
 import { Logo } from '../components/Logo';
 
 const nav = [
@@ -22,9 +21,7 @@ export function Layout() {
               to={to}
               end
               className={({ isActive }) =>
-                isActive
-                  ? 'text-brand-300'
-                  : 'text-slate-400 hover:text-slate-200'
+                isActive ? 'text-brand-300' : 'text-slate-400 hover:text-slate-200'
               }
             >
               {label}
