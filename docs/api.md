@@ -75,6 +75,7 @@ interface TintBlock { colors: TintColor[]; items: Record<string, TintMode> }
 | `GENERATOR` | `{ name, version }` of the producing toolkit |
 | `sampleMode`, `atlasSampling` | Skia filter mode from `units.sample` |
 | `SHADER_SKS`, `SHADER_DEFAULTS` | SkSL source + default uniforms (`null` when runtime off) |
+| `TIER_SHADERS` | tier name → embedded SkSL source (empty without a `tiers` block) |
 | `TINTS` | `Record<key, '#RRGGBB'>` from the spec's `colors` (empty without a tint block) |
 | `TINT_MODES` | `Record<itemId, TintMode>` for tinted items |
 | `SILHOUETTE_MATRIX` | 4×5 color matrix: black × original alpha |
@@ -91,6 +92,7 @@ canonicalMask(mask: number, size: 16 | 47): number
 glyphFrame(char: string, item?): Frame
 textSprites(text, origin, item?, scale?): SpriteSpec[]
 shaderUniforms(time): Record<string, number | number[]>
+tierUniforms(name, time?): Record<string, number>   // tier effects (spec `tiers` block)
 ```
 
 ### Runtime tint helpers

@@ -34,6 +34,20 @@ def build_shader(spec: Spec) -> tuple[str, dict] | tuple[None, None]:
     return source, block
 
 
+def build_tier_shaders(spec: Spec) -> dict[str, dict]:
+    """name -> {source, file, template, uniforms} for each spec `tiers` entry."""
+    out: dict[str, dict] = {}
+    for name, rule in (spec.tiers or {}).items():
+        template = rule["template"]
+        out[name] = {
+            "source": sksl.render_tier_shader(template),
+            "file": sksl.tier_shader_filename(spec.name, name),
+            "template": template,
+            "uniforms": sksl.tier_shader(spec.seed, template, rule["params"]),
+        }
+    return out
+
+
 def _frame_ids(item_id: str, count: int) -> list[str]:
     return [f"{item_id}_{i:02d}" for i in range(count)]
 
@@ -115,7 +129,8 @@ def build_manifest(spec: Spec, records: list[dict], atlas_name: str,
                    sheet: Image.Image, spec_path: str, autotile_map: dict | None = None,
                    shader_block: dict | None = None, font_map: dict | None = None,
                    mipmaps_block: dict | None = None,
-                   silhouette_name: str | None = None) -> dict:
+                   silhouette_name: str | None = None,
+                   tiers_block: dict | None = None) -> dict:
     anim: dict[str, dict] = {}
     for name, a in spec.animations.items():
         item = next(it for it in spec.items if it.id == a.frames)
@@ -160,6 +175,7 @@ def build_manifest(spec: Spec, records: list[dict], atlas_name: str,
         },
         **({"autotile": autotile_map} if autotile_map else {}),
         **({"shader": shader_block} if shader_block else {}),
+        **({"tiers": tiers_block} if tiers_block else {}),
         **({"font": font_map} if font_map else {}),
         **({"mipmaps": mipmaps_block} if mipmaps_block else {}),
         **({"tint": tint_block} if tint_block else {}),
@@ -336,6 +352,38 @@ export function pickTier(px: number): Tier {{
     _atomic_write_bytes(out_dir / "index.ts", source.encode())
 
 
+def _ts_tier_block(m: dict) -> str:
+    """TIER_SHADERS + tierUniforms (uniforms read from manifest.tiers)."""
+    tiers = m.get("tiers") or {}
+    entries: list[str] = []
+    for name, t in tiers.items():
+        source = sksl.render_tier_shader(t["template"])
+        escaped = (
+            source.replace("\\", "\\\\").replace("`", "\\`")
+            .replace("${", "\\${")
+        )
+        entries.append(f"  {name}: `{escaped}`")
+    if not tiers:
+        body = ""
+        shape = "export const TIER_SHADERS: Record<string, string> = {} as const;\n"
+    else:
+        body = ",\n".join(entries)
+        shape = ("export const TIER_SHADERS: Record<string, string> = {\n"
+                 f"{body}\n"
+                 "} as const;\n")
+    return (
+        f"{shape}"
+        "export type TierName = string;\n"
+        "\n"
+        "/** Uniforms for a tier effect (seed-derived; `time` is the anim clock). */\n"
+        "export function tierUniforms(name: TierName, time = 0): Record<string, number> {\n"
+        "  const u = manifest.tiers?.[name]?.uniforms;\n"
+        "  if (!u) throw new Error('unknown tier shader: ' + name);\n"
+        "  return { ...u, time };\n"
+        "}\n"
+    )
+
+
 def _ts_shader_block(m: dict) -> str:
     shader = m.get("shader")
     if not shader:
@@ -480,6 +528,7 @@ export function silhouetteColors(specs: readonly { id: string }[]): SkColor[] {
 def _ts_source(m: dict) -> str:
     atlas = m["files"]["atlas"]
     shader_block = _ts_shader_block(m)
+    tier_block = _ts_tier_block(m)
     tint_block = _ts_tint_block()
     sil_name = m["files"].get("silhouette")
     sil_source = (
@@ -554,6 +603,12 @@ export interface ShaderBlock {{
   uniforms: ShaderUniforms;
 }}
 
+export interface TierBlock {{
+  file: string;
+  template: string;
+  uniforms: Record<string, number>;
+}}
+
 export interface GlyphEntry {{
   id: string;
   advance: number;
@@ -601,6 +656,7 @@ export interface Manifest {{
   tiles: {{ ids: string[] }};
   autotile?: Autotile;
   shader?: ShaderBlock;
+  tiers?: Record<string, TierBlock>;
   font?: FontBlock;
   mipmaps?: MipmapsBlock;
   tint?: TintBlock;
@@ -608,6 +664,7 @@ export interface Manifest {{
 }}
 
 {shader_block}
+{tier_block}
 export const ATLAS_SOURCE = require('./{atlas}') as number;
 {sil_source}export const manifest: Manifest = require('./manifest.json') as Manifest;
 export const GENERATOR = manifest.meta?.generator ?? {{ name: 'sprout', version: 'unknown' }};

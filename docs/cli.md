@@ -20,7 +20,8 @@ sprout init --out ./assets/starter --no-generate   # spec only
 ### `sprout generate <spec>`
 
 Generates one spec: `atlas.png` + `manifest.json` + `index.ts` (plus optional
-`.sksl`, `.tpsheet.json`, mip levels — see export options below).
+`.sksl`, per-tier `.sksl` files, `.tpsheet.json`, mip levels — see export
+options below).
 
 ```bash
 sprout generate specs/demo.json --out ./out

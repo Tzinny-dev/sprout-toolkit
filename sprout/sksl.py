@@ -137,3 +137,125 @@ def render_shader() -> str:
     from . import __version__
 
     return f"// sprout {__version__} — seed in uniforms (manifest.json > shader.uniforms)\n{TEMPLATE}"
+
+
+# ---------------------------------------------------------------------------
+# Tier effect templates (hueco B3): overlays drawn on top of sprites.
+# Like TEMPLATE, sources carry no backticks/`${` so index.ts can embed
+# them as string literals. `invisible` is the trivial alpha-0 helper.
+
+TIER_TEMPLATES = ("holographic", "neon", "legend-glow", "invisible")
+
+TIER_DEFAULTS: dict[str, dict] = {
+    "holographic": {"speed": 0.35, "glow": 0.5},
+    "neon": {"speed": 1.5, "glow": 0.6},
+    "legend-glow": {"speed": 1.0, "glow": 0.4},
+    "invisible": {},
+}
+
+_TIER_BODIES: dict[str, str] = {
+    "holographic": """half4 main(float2 xy) {
+  float t = u_time * u_speed + u_seed * 0.001;
+  float band = sin((xy.x + xy.y) * 0.06 + t * 2.0) * 0.5 + 0.5;
+  float hue = fract(band + (xy.x - xy.y) * 0.002 + t * 0.1);
+  float3 col = 0.5 + 0.5 * cos(6.28318 * (hue + float3(0.0, 0.33, 0.67)));
+  float alpha = 0.35 + 0.3 * sin((xy.x - xy.y) * 0.04 - t);
+  return half4(col, clamp(alpha, 0.0, 1.0) * u_glow);
+}""",
+    "neon": """half4 main(float2 xy) {
+  float t = u_time * u_speed + u_seed * 0.001;
+  float pulse = 0.5 + 0.5 * sin(t * 3.0);
+  float line = abs(sin(xy.x * 0.07 + t) * sin(xy.y * 0.07 - t * 0.7));
+  float glow = pow(1.0 - line, 6.0);
+  float3 col = float3(0.2, 1.0, 0.9) * (0.7 + 0.3 * pulse);
+  return half4(col, glow * u_glow * (0.5 + 0.5 * pulse));
+}""",
+    "legend-glow": """half4 main(float2 xy) {
+  float t = u_time * u_speed + u_seed * 0.001;
+  float breathe = 0.5 + 0.5 * sin(t * 1.5);
+  float3 col = float3(1.0, 0.85, 0.4);
+  float g = fract(sin(dot(floor(xy * 0.25), float2(12.9898, 78.233)) + t) * 43758.5453);
+  float sparkle = step(0.985, g) * (0.5 + 0.5 * sin(t * 9.0));
+  float alpha = u_glow * (0.3 + 0.5 * breathe) + sparkle * 0.4;
+  return half4(col, clamp(alpha, 0.0, 0.85));
+}""",
+    "invisible": """half4 main(float2 xy) {
+  return half4(0.0, 0.0, 0.0, 0.0);
+}""",
+}
+
+
+def normalize_tiers(raw: object) -> dict[str, dict] | None:
+    """Normalize the spec's ``tiers`` block: name -> {template, params}."""
+    if raw is None or raw is False:
+        return None
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError(
+            f"tiers must be a non-empty object of name -> template, "
+            f"received {raw!r}")
+    import re
+
+    out: dict[str, dict] = {}
+    for name, rule in raw.items():
+        if not re.fullmatch(r"[A-Za-z0-9_-]{1,32}", str(name)):
+            raise ValueError(
+                f"invalid tier name {name!r} in tiers "
+                f"(use [A-Za-z0-9_-], max 32)")
+        if isinstance(rule, str):
+            rule = {"template": rule}
+        if not isinstance(rule, dict) or "template" not in rule:
+            raise ValueError(
+                f"tiers.{name} must be a template name or "
+                f"{{'template': ...}}, received {raw.get(name)!r}")
+        template = str(rule["template"])
+        if template not in TIER_TEMPLATES:
+            raise ValueError(
+                f"invalid tiers.{name}.template {template!r} "
+                f"(available: {', '.join(TIER_TEMPLATES)})")
+        params = dict(TIER_DEFAULTS[template])
+        unknown_params = set(rule) - {"template"}
+        for key in unknown_params:
+            if key not in TIER_DEFAULTS[template]:
+                raise ValueError(
+                    f"tiers.{name} has unknown key {key!r} "
+                    f"(template '{template}' accepts: "
+                    f"{', '.join(sorted(TIER_DEFAULTS[template])) or 'none'})")
+        for key in unknown_params:
+            params[key] = float(rule[key])
+        if params.get("speed", 0.0) < 0:
+            raise ValueError(f"tiers.{name}.speed must be >= 0")
+        if not 0.0 <= params.get("glow", 0.0) <= 1.0:
+            raise ValueError(f"tiers.{name}.glow must be within 0..1")
+        out[str(name)] = {"template": template, "params": params}
+    return out
+
+
+def tier_shader(seed: int, template: str, params: dict) -> dict:
+    """Uniforms for one tier shader (seed-derived, deterministic)."""
+    return {
+        "seed": seed % 2**31,
+        "time": 0.0,
+        **{k: float(v) for k, v in params.items()},
+    }
+
+
+def render_tier_shader(template: str) -> str:
+    """SkSL source for a tier template (fixed body + header)."""
+    from . import __version__
+
+    header = (
+        f"// sprout {__version__} — tier template: {template} "
+        f"(uniforms in manifest.json > tiers.<name>.uniforms)"
+    )
+    uniforms = (
+        "uniform float u_seed;\nuniform float u_time;\n"
+        + "".join(
+            f"uniform float u_{k};\n"
+            for k in sorted(TIER_DEFAULTS[template])
+        )
+    )
+    return f"{header}\n{uniforms}{_TIER_BODIES[template]}\n"
+
+
+def tier_shader_filename(spec_name: str, tier_name: str) -> str:
+    return f"{spec_name}.{tier_name}.sksl"

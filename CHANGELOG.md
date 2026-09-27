@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **Tier effect shaders (spec `tiers` block)**: named overlay templates
+  beyond the FBM terrain shader — `holographic`, `neon`, `legend-glow` and
+  the trivial `invisible` (alpha 0). Each entry writes `<name>.<tier>.sksl`
+  + a manifest `tiers` block (seed-derived uniforms) + `TIER_SHADERS` /
+  `tierUniforms(name, time)` in `index.ts`. String shorthand
+  (`"holo": "holographic"`) or `{template, speed, glow}`; the mapping is
+  yours — the toolkit stays domain-free. Tests: `test_sksl.py` (+13).
 - **Multi-escala (`--tiers`)**: `sprout generate <spec> --tiers 64,128,256`
   emits one full output per resolution in `<px>/` subdirs plus a combined
   `index.ts` (`atlasSources`, `TIERS`, `pickTier`, base-tier re-export).

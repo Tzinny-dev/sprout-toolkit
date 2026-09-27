@@ -76,6 +76,7 @@ class Spec:
     layout: Layout
     animations: dict[str, Anim]
     runtime: dict | None = None
+    tiers: dict | None = None
     files_atlas: str = ""
     target: str = "expo-rn-skia"
     colors: list[TintColor] = field(default_factory=list)
@@ -240,6 +241,11 @@ def load_spec(path: Path) -> Spec:
     except ValueError as e:
         raise SpecError(f"invalid runtime: {e}") from e
 
+    try:
+        tiers = sksl.normalize_tiers(raw.get("tiers"))
+    except ValueError as e:
+        raise SpecError(f"invalid tiers: {e}") from e
+
     files_atlas = ""
     files_raw = raw.get("files") or {}
     files_atlas = str(files_raw.get("atlas", ""))
@@ -251,6 +257,7 @@ def load_spec(path: Path) -> Spec:
         layout=layout,
         animations=animations,
         runtime=runtime,
+        tiers=tiers,
         files_atlas=files_atlas,
         target=str(raw.get("target", "expo-rn-skia")),
         colors=colors,

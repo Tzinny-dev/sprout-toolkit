@@ -36,6 +36,7 @@ from .exporter import (
     build_shader,
     build_sheet,
     build_texturepacker,
+    build_tier_shaders,
     compute_mipmap_meta,
     emit_index_ts,
     emit_tier_index_ts,
@@ -84,15 +85,24 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
     font_map = build_font_map(spec, frames)
     shader_source, shader_block = build_shader(spec)
     shader_path = out / shader_filename(spec) if shader_block else None
+    tier_shaders = build_tier_shaders(spec)
+    tiers_block = (
+        {name: {"file": t["file"], "template": t["template"],
+                "uniforms": t["uniforms"]}
+         for name, t in tier_shaders.items()}
+        or None
+    )
     mip_meta = compute_mipmap_meta(sheet, spec, mip_levels) if mipmaps else []
     manifest = build_manifest(spec, records, atlas_name, sheet, str(spec_path),
                               autotile_map, shader_block, font_map,
                               {"levels": mip_meta} if mip_meta else None,
-                              "silhouette.png" if silhouette else None)
+                              "silhouette.png" if silhouette else None,
+                              tiers_block)
 
     if skip_existing and atlas_path.is_file() and manifest_path.is_file() and index_path.is_file():
         missing_extra = (
             (shader_block and not (shader_path and shader_path.is_file()))
+            or any(not (out / t["file"]).is_file() for t in tier_shaders.values())
             or (texturepacker and not tp_path.is_file())
             or (silhouette and not (sil_path and sil_path.is_file()))
             or (mipmaps and not all((out / lvl["file"]).is_file() for lvl in mip_meta))
@@ -112,7 +122,11 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
                 or (shader_path is not None
                     and shader_path.read_bytes() == shader_source.encode())
             )
-            if current == fresh and same_manifest and same_shader:
+            same_tiers = all(
+                (out / t["file"]).read_text() == t["source"]
+                for t in tier_shaders.values()
+            )
+            if current == fresh and same_manifest and same_shader and same_tiers:
                 return {"spec": spec, "out": out, "atlas": atlas_path,
                         "crc": current, "skipped": True, "manifest": manifest}
 
@@ -123,6 +137,8 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
     if shader_source is not None and shader_path is not None:
         shader_path.parent.mkdir(parents=True, exist_ok=True)
         shader_path.write_text(shader_source)
+    for t in tier_shaders.values():
+        (out / t["file"]).write_text(t["source"])
     emit_index_ts(manifest, index_path)
     if texturepacker:
         tp = build_texturepacker(spec, records, atlas_name, sheet, png_mode)

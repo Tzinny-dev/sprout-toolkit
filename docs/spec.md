@@ -118,6 +118,36 @@ manifest). Accepts `false` (default), `true` (defaults), or an object:
 "runtime": { "freq": 0.05, "octaves": 4, "tileable": true }
 ```
 
+## Tier shaders (optional)
+
+Named effect overlays — one `<name>.<tier>.sksl` each, a `tiers` block in
+the manifest, and `TIER_SHADERS` / `tierUniforms()` in `index.ts`. Each
+entry maps *your own* tier name to a template:
+
+| template | effect |
+|---|---|
+| `holographic` | iridescent moving bands |
+| `neon` | pulsing glow lines |
+| `legend-glow` | breathing glow + sparkles |
+| `invisible` | alpha-0 helper (covers nothing — trivial baseline) |
+
+```json
+"tiers": {
+  "holo": "holographic",
+  "boost": { "template": "neon", "speed": 2.0, "glow": 0.8 },
+  "legend": "legend-glow"
+}
+```
+
+| param | default | rules |
+|---|---|---|
+| `speed` | template's | `>= 0` — animation rate |
+| `glow` | template's | `0..1` — overlay opacity |
+
+Tier names: `[A-Za-z0-9_-]`, max 32 chars. Uniforms are seed-derived and
+live in `manifest.tiers.<name>.uniforms`; drive them with
+`tierUniforms(name, time)`.
+
 ## Top-level optional fields
 
 | field | default | description |
@@ -125,7 +155,7 @@ manifest). Accepts `false` (default), `true` (defaults), or an object:
 | `target` | `expo-rn-skia` | emit target marker (informational) |
 | `files.atlas` | `<name>_atlas.png` | output PNG filename |
 | `colors` | `[]` | runtime tint palette (see [Runtime tint](#runtime-tint-optional)) |
-| `layout` / `animations` / `runtime` | see above | optional blocks |
+| `layout` / `animations` / `runtime` / `tiers` | see above | optional blocks |
 
 ## Full example
 
