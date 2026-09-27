@@ -1,0 +1,259 @@
+{
+  "name": "objects_atlas",
+  "seed": 777,
+  "target": "expo-rn-skia",
+  "files": {
+    "atlas": "atlas.png"
+  },
+  "layout": {
+    "framePx": 64,
+    "cols": 9,
+    "tileLogical": 32,
+    "sample": "nearest"
+  },
+  "items": [
+    {
+      "id": "apple",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "fruit",
+        "form": "apple"
+      }
+    },
+    {
+      "id": "cherry",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "fruit",
+        "form": "cherry"
+      }
+    },
+    {
+      "id": "banana",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "fruit",
+        "form": "banana"
+      }
+    },
+    {
+      "id": "grapes",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "fruit",
+        "form": "grapes"
+      }
+    },
+    {
+      "id": "strawberry",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "fruit",
+        "form": "strawberry"
+      }
+    },
+    {
+      "id": "candy",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "sweet",
+        "form": "candy"
+      }
+    },
+    {
+      "id": "donut",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "sweet",
+        "form": "donut"
+      }
+    },
+    {
+      "id": "cookie",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "sweet",
+        "form": "cookie"
+      }
+    },
+    {
+      "id": "cupcake",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "sweet",
+        "form": "cupcake"
+      }
+    },
+    {
+      "id": "lollipop",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "sweet",
+        "form": "lollipop"
+      }
+    },
+    {
+      "id": "bottle",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "potion",
+        "form": "bottle"
+      }
+    },
+    {
+      "id": "flask",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "potion",
+        "form": "flask"
+      }
+    },
+    {
+      "id": "vial",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "potion",
+        "form": "vial"
+      }
+    },
+    {
+      "id": "coin",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "treasure",
+        "form": "coin"
+      }
+    },
+    {
+      "id": "gem",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "treasure",
+        "form": "gem"
+      }
+    },
+    {
+      "id": "star",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "treasure",
+        "form": "star"
+      }
+    },
+    {
+      "id": "ring",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "treasure",
+        "form": "ring"
+      }
+    },
+    {
+      "id": "hammer",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "tool",
+        "form": "hammer"
+      }
+    },
+    {
+      "id": "key",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "tool",
+        "form": "key"
+      }
+    },
+    {
+      "id": "pencil",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "tool",
+        "form": "pencil"
+      }
+    },
+    {
+      "id": "spoon",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "tool",
+        "form": "spoon"
+      }
+    },
+    {
+      "id": "fork",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "tool",
+        "form": "fork"
+      }
+    },
+    {
+      "id": "book",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "paper",
+        "form": "book"
+      }
+    },
+    {
+      "id": "scroll",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "paper",
+        "form": "scroll"
+      }
+    },
+    {
+      "id": "envelope",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "paper",
+        "form": "envelope"
+      }
+    },
+    {
+      "id": "bag",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "container",
+        "form": "bag"
+      }
+    },
+    {
+      "id": "box",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "container",
+        "form": "box"
+      }
+    }
+  ]
+}

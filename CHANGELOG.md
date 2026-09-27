@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`props` v3 object grammar**: the generator gains a `form` param and
+  seven new kinds covering flavor/thing catalog sets — `fruit` (5),
+  `sweet` (5), `potion` (3), `treasure` (4), `tool` (5), `paper` (3),
+  `container` (2) = 27 forms; `form: "auto"` picks one per variant from
+  the seed, explicit `form` pins it (classic v1 kinds stay formless and
+  byte-stable). v3 kinds derive their outline from `fill` via the shared
+  rule and accept an `accent` override. Spec: `specs/objects.json`,
+  showcase: `docs/showcase/objects.png`.
+- **Bundled-font symbol coverage test**: a curated BMP symbol set
+  (♥★☆☀✂⚑⚙✓✗⚠♪❤…) is asserted to render as real glyphs in DejaVu Sans
+  Mono Bold (mask compared against `.notdef`). Supplementary-plane
+  codepoints (emoji, ⭐❌➿) fall back to `sprout import`.
 - **`flora` generator**: trees and forest-floor plants. Trees combine a
   tapered trunk (`straight` / `gnarled` = lean + kink) with three canopy
   shapes (`round`, `columnar`, `conifer`) via a union-outline pass;

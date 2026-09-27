@@ -10,11 +10,14 @@ from PIL import Image
 
 from sprout.cli import _generate
 from sprout.generators import GENERATORS
-from sprout.generators.props import Props
+from sprout.generators.props import FORMS, Props
 
 SPEC = Path(__file__).resolve().parents[1] / "specs" / "props.json"
+SPEC_OBJECTS = Path(__file__).resolve().parents[1] / "specs" / "objects.json"
 
 ALL_KINDS = ("rock", "bush", "chest", "mushroom", "flower")
+V3_KINDS = ("fruit", "sweet", "potion", "treasure", "tool", "paper", "container")
+V3_FORMS = [(k, f) for k in V3_KINDS for f in FORMS[k][1:]]
 
 
 def _crc(p: Path) -> int:
@@ -124,6 +127,82 @@ def test_anchor_falls_back_to_center_on_empty_frame() -> None:
     assert _anchor_from_alpha(empty) == {"x": 32.0, "y": 32.0}
 
 
+# ── v3 object grammar ──────────────────────────────────────────────────
+def test_v3_kinds_render_nonempty() -> None:
+    gen = Props()
+    for kind in V3_KINDS:
+        frames = gen.generate(seed=1, count=2, frame_px=64,
+                              params={"kind": kind, "form": "auto"})
+        assert len(frames) == 2
+        for fr in frames:
+            assert fr.image.size == (64, 64)
+            assert _opaque(fr.image), f"kind '{kind}' rendered empty"
+
+
+@pytest.mark.parametrize("kind, form", V3_FORMS)
+def test_every_form_renders_nonempty(kind: str, form: str) -> None:
+    for size in (32, 64, 128):
+        frames = Props().generate(seed=7, count=1, frame_px=size,
+                                  params={"kind": kind, "form": form})
+        img = frames[0].image
+        assert img.getchannel("A").getbbox() is not None, \
+            f"{kind}/{form} empty at {size}px"
+
+
+def test_invalid_form_raises() -> None:
+    with pytest.raises(ValueError, match="form"):
+        Props().generate(1, 1, 64, {"kind": "fruit", "form": "potion"})
+
+
+def test_form_rejected_for_formless_kind() -> None:
+    """v1 kinds must not accept a form (their output is frozen)."""
+    with pytest.raises(ValueError, match="form"):
+        Props().generate(1, 1, 64, {"kind": "rock", "form": "apple"})
+
+
+def test_auto_form_is_one_of_the_explicit_forms() -> None:
+    gen = Props()
+    explicit = {gen.generate(3, 1, 64, {"kind": "fruit", "form": f})[0].image.tobytes()
+                for f in FORMS["fruit"][1:]}
+    picked = {gen.generate(s, 1, 64, {"kind": "fruit", "form": "auto"})[0].image.tobytes()
+              for s in range(30)}
+    assert picked <= explicit
+    assert len(picked) >= 3, "auto must vary across seeds"
+
+
+def test_form_determinism() -> None:
+    a = Props().generate(42, 3, 64, {"kind": "sweet", "form": "donut"})
+    b = Props().generate(42, 3, 64, {"kind": "sweet", "form": "donut"})
+    assert [f.image.tobytes() for f in a] == [f.image.tobytes() for f in b]
+
+
+def test_v3_color_overrides() -> None:
+    frames = Props().generate(
+        1, 1, 64,
+        {"kind": "fruit", "form": "apple", "fill": [10, 20, 30],
+         "accent": [1, 2, 3], "outline": [4, 5, 6]})
+    colors = {px[:3] for px in frames[0].image.getdata() if px[3] > 0}
+    assert {(10, 20, 30), (1, 2, 3), (4, 5, 6)} <= colors
+
+
+def test_v3_outline_derives_from_fill() -> None:
+    from sprout import palettes
+
+    fill = (214, 64, 70)
+    frames = Props().generate(1, 1, 64, {"kind": "fruit", "form": "apple",
+                                         "fill": list(fill)})
+    colors = {px[:3] for px in frames[0].image.getdata() if px[3] > 0}
+    assert palettes.outline_color(fill) in colors
+
+
+def test_v3_anchor_within_bounds() -> None:
+    for kind, form in V3_FORMS:
+        anchor = Props().generate(5, 1, 64,
+                                  {"kind": kind, "form": form})[0].meta["anchor"]
+        assert 0 <= anchor["x"] <= 64, f"{kind}/{form}"
+        assert 0 <= anchor["y"] <= 64, f"{kind}/{form}"
+
+
 # ── Full pipeline (spec -> atlas + manifest + index.ts) ─────────────────
 def test_spec_generates_all_outputs(tmp_path: Path) -> None:
     out = tmp_path / "out"
@@ -172,3 +251,31 @@ def test_skip_existing_idempotent(tmp_path: Path) -> None:
     assert r1["skipped"] is False
     assert r2["skipped"] is True
     assert r1["crc"] == r2["crc"]
+
+
+def test_objects_spec_generates_all_outputs(tmp_path: Path) -> None:
+    out = tmp_path / "out"
+    _generate(SPEC_OBJECTS, out, None, False)
+    assert (out / "atlas.png").is_file()
+    assert (out / "manifest.json").is_file()
+    assert (out / "index.ts").is_file()
+
+
+def test_objects_spec_deterministic(tmp_path: Path) -> None:
+    a, b = tmp_path / "a", tmp_path / "b"
+    _generate(SPEC_OBJECTS, a, None, False)
+    _generate(SPEC_OBJECTS, b, None, False)
+    assert _crc(a / "atlas.png") == _crc(b / "atlas.png")
+    assert (a / "manifest.json").read_bytes() == (b / "manifest.json").read_bytes()
+
+
+def test_objects_spec_covers_every_form(tmp_path: Path) -> None:
+    """The spec pins one item per form — the grammar's showcase/coverage."""
+    out = tmp_path / "out"
+    _generate(SPEC_OBJECTS, out, None, False)
+    m = json.loads((out / "manifest.json").read_text())
+    ids = {f["id"].rsplit("_", 1)[0] for f in m["frames"]}
+    assert ids == {form for _, form in V3_FORMS}
+    assert len(m["frames"]) == len(V3_FORMS)
+    for f in m["frames"]:
+        assert "anchor" in f

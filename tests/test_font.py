@@ -57,6 +57,30 @@ def test_printable_glyphs_are_nonempty() -> None:
         assert _opaque(fr.image), f"character '{fr.meta['char']}' rendered empty"
 
 
+# ── Symbol coverage (Fase 4: símbolos -> glifos) ────────────────────────
+# A curated BMP set the bundled DejaVu Sans Mono Bold renders as real
+# glyphs (checked against .notdef). Supplementary-plane codepoints —
+# emoji, ⭐❌❗➿ and friends — fall back to tofu: those species go
+# through `sprout import`, not the `font` generator.
+BMP_SYMBOLS = ("♥★☆☀☁☂✂✉⚑⚙⚡✓✗⚠♪♫☕✿❀♠♣♦⚔⚖✈⌘"
+               "▪▫▶◀◻◼☑✔✚✝✞✡✢✤✦✧✩✪✭✮✯✰✱✲✳✴❄❇❤➡⬇")
+
+
+def test_bundled_font_covers_symbol_set() -> None:
+    from PIL import ImageFont
+
+    from sprout.generators.font import resolve_font_path
+
+    # `_opaque` can't tell a glyph from a tofu box (both have ink), so
+    # compare each mask against .notdef directly.
+    font = ImageFont.truetype(resolve_font_path({}), 16)
+    notdef = bytes(font.getmask("\ue000"))
+    for ch in BMP_SYMBOLS:
+        mask = font.getmask(ch)
+        assert mask.getbbox() is not None and bytes(mask) != notdef, \
+            f"symbol '{ch}' not in bundled font"
+
+
 # ── Metadata ─────────────────────────────────────────────────────────────
 def test_meta_has_char_and_advance() -> None:
     frames = Font().generate(1, 2, 48, {"chars": "AB"})

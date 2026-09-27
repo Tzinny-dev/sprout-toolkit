@@ -13,7 +13,7 @@ See [spec schema](/docs/spec) for `colors` + `tint` (runtime recoloring).
 |---|---|---|
 | `terrain` | Seamless noise tiles + 16/47 autotile | any (47 or 16 with `autotile`) |
 | `blob_walk` | 8-frame walk cycle (hero blob) | 8 |
-| `props` | Static objects with anchor points | any |
+| `props` | Static objects: 5 classic kinds + object grammar | any |
 | `critter` | Parametric animals (5 archetypes + parts) | any (idle) |
 | `flora` | Trees (3 canopies) + forest-floor plants | any (idle or sway) |
 | `face` | Emotion faces (16 moods + part overrides) | any (idle + blink) |
@@ -55,9 +55,29 @@ the point where the object touches the ground, for tilemap-aligned placement.
 
 | param | default | description |
 |---|---|---|
-| `kind` | `rock` | `rock` \| `bush` \| `chest` \| `mushroom` \| `flower` |
+| `kind` | `rock` | see kinds below |
+| `form` | `auto` | v3 kinds: `auto` \| a form of the kind (per-kind) |
 | `fill` | per-kind | `[r, g, b]` fill override |
-| `outline` | per-kind | `[r, g, b]` outline override |
+| `accent` | per-kind | `[r, g, b]` secondary color (v3 kinds) |
+| `outline` | per-kind | `[r, g, b]` outline override (v3 derives `darken(fill, .55)`) |
+
+**Classic kinds** (single shape, `form` must stay `auto`): `rock`, `bush`,
+`chest`, `mushroom`, `flower`.
+
+**v3 object grammar** — parametric food/object families covering flavor
+and thing catalog sets; `form: auto` picks a form per variant from the
+seed, explicit `form` pins it. Example spec: `specs/objects.json`,
+showcase: `docs/showcase/objects.png`.
+
+| `kind` | forms |
+|---|---|
+| `fruit` | `apple` \| `cherry` \| `banana` \| `grapes` \| `strawberry` |
+| `sweet` | `candy` \| `donut` \| `cookie` \| `cupcake` \| `lollipop` |
+| `potion` | `bottle` \| `flask` \| `vial` |
+| `treasure` | `coin` \| `gem` \| `star` \| `ring` |
+| `tool` | `hammer` \| `key` \| `pencil` \| `spoon` \| `fork` |
+| `paper` | `book` \| `scroll` \| `envelope` |
+| `container` | `bag` \| `box` |
 
 ## `critter`
 

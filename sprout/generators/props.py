@@ -1,5 +1,16 @@
-"""``props`` generator: static tile objects (rocks, bushes, chests,
-mushrooms, flowers).
+"""``props`` generator: static tile objects.
+
+Classic kinds (v1): rocks, bushes, chests, mushrooms, flowers.
+v3 object grammar: parametric food/object families with a ``form``
+picker, covering flavor and thing catalog sets:
+
+    fruit    apple | cherry | banana | grapes | strawberry
+    sweet    candy | donut | cookie | cupcake | lollipop
+    potion   bottle | flask | vial
+    treasure coin | gem | star | ring
+    tool     hammer | key | pencil | spoon | fork
+    paper    book | scroll | envelope
+    container bag | box
 
 Each frame is a deterministic variant of the requested prop. The seed is
 derived from ``seed * 1000 + base + i`` (same convention as ``terrain``), so
@@ -8,9 +19,13 @@ breaking determinism. Uses PIL primitives (ellipses, polygons, arcs) — no
 continuous noise is required, so each variant is generated in O(1).
 
 Spec parameters (item.params):
-    kind   : "rock" | "bush" | "chest" | "mushroom" | "flower"  (default "rock")
+    kind   : any key of ``FORMS``  (default "rock")
+    form   : "auto" | a form of the kind's vocabulary (v3 kinds only;
+             "auto" picks a form per variant from the seed)
     fill   : [r, g, b]  fill color (optional override)
-    outline: [r, g, b]  outline color (optional override)
+    accent : [r, g, b]  secondary color (v3 kinds)
+    outline: [r, g, b]  outline color (optional override; v3 kinds derive
+             it from ``fill`` via the shared ``darken(fill, .55)`` rule)
 
 Each frame also carries an anchor point in ``meta["anchor"]`` — the point
 where the object "touches the ground", in local frame pixels (same
@@ -24,7 +39,10 @@ import math
 
 from PIL import Image, ImageDraw
 
+from .. import palettes
 from .base import FrameData, Generator
+
+TAU = math.tau
 
 
 # ── Deterministic hash (identical to terrain.cell) ────────────────────────
@@ -50,8 +68,103 @@ def _anchor_from_alpha(img: Image.Image) -> dict:
     return {"x": (x0 + x1) / 2, "y": y1}
 
 
+def _lighten(c: tuple, k: float = 0.45) -> tuple:
+    """Scale an RGB triple toward white (mirror of ``palettes.darken``)."""
+    return tuple(min(255, int(round(v + (255 - v) * k))) for v in c)
+
+
+def _star_pts(cx: float, cy: float, ro: float, ri: float,
+              n: int = 5) -> list[tuple[float, float]]:
+    """Star polygon, tip pointing up (``n`` arms)."""
+    pts = []
+    for k in range(n * 2):
+        a = -math.pi / 2 + math.pi * k / n
+        rad = ro if k % 2 == 0 else ri
+        pts.append((cx + math.cos(a) * rad, cy + math.sin(a) * rad))
+    return pts
+
+
+def _rrect(d: ImageDraw.ImageDraw, box: list, radius: float, **kw) -> None:
+    """Rounded rect that degrades to a plain rect on thin boxes.
+
+    PIL's ``rounded_rectangle`` raises in two float edge cases that small
+    frames hit: an inner strip inverts when ``2*radius`` outgrows the box,
+    and ``y0 + width - 1`` can round *below* ``y0`` for float coords.
+    Quantizing the box to ints avoids both; when the radius no longer fits
+    the box we draw a plain rectangle instead.
+    """
+    x0, y0, x1, y1 = (round(v) for v in box)
+    rad = min(radius, (min(x1 - x0, y1 - y0) - 2) / 2)
+    if rad < 1:
+        d.rectangle([x0, y0, x1, y1], **kw)
+    else:
+        d.rounded_rectangle([x0, y0, x1, y1], radius=int(rad), **kw)
+
+
+# kind -> allowed forms ("auto" always first). Formless v1 kinds only
+# accept "auto" — the form param must not silently change their output.
+FORMS: dict[str, tuple[str, ...]] = {
+    "rock": ("auto",), "bush": ("auto",), "chest": ("auto",),
+    "mushroom": ("auto",), "flower": ("auto",),
+    "fruit": ("auto", "apple", "cherry", "banana", "grapes", "strawberry"),
+    "sweet": ("auto", "candy", "donut", "cookie", "cupcake", "lollipop"),
+    "potion": ("auto", "bottle", "flask", "vial"),
+    "treasure": ("auto", "coin", "gem", "star", "ring"),
+    "tool": ("auto", "hammer", "key", "pencil", "spoon", "fork"),
+    "paper": ("auto", "book", "scroll", "envelope"),
+    "container": ("auto", "bag", "box"),
+}
+FORMLESS = frozenset({"rock", "bush", "chest", "mushroom", "flower"})
+
+# v3 palette per (kind, form): fill = dominant/tintable, accent = secondary.
+# outline derives from fill via the shared rule unless overridden.
+FORM_COLORS: dict[str, dict[str, dict[str, tuple]]] = {
+    "fruit": {
+        "apple":      {"fill": (214, 64, 70),   "accent": (96, 160, 76)},
+        "cherry":     {"fill": (200, 44, 66),   "accent": (96, 160, 76)},
+        "banana":     {"fill": (242, 206, 88),  "accent": (150, 110, 64)},
+        "grapes":     {"fill": (140, 94, 182),  "accent": (96, 160, 76)},
+        "strawberry": {"fill": (226, 74, 88),   "accent": (96, 160, 76)},
+    },
+    "sweet": {
+        "candy":   {"fill": (238, 120, 160), "accent": (255, 196, 216)},
+        "donut":   {"fill": (216, 168, 112), "accent": (242, 134, 172)},
+        "cookie":  {"fill": (198, 152, 98),  "accent": (84, 52, 38)},
+        "cupcake": {"fill": (255, 164, 192), "accent": (126, 174, 222)},
+        "lollipop": {"fill": (250, 116, 148), "accent": (255, 238, 242)},
+    },
+    "potion": {
+        "bottle": {"fill": (98, 196, 130),  "accent": (212, 236, 240)},
+        "flask":  {"fill": (146, 110, 214), "accent": (212, 236, 240)},
+        "vial":   {"fill": (240, 186, 74),  "accent": (212, 236, 240)},
+    },
+    "treasure": {
+        "coin": {"fill": (242, 198, 70),  "accent": (206, 156, 44)},
+        "gem":  {"fill": (86, 192, 222),  "accent": (206, 242, 250)},
+        "star": {"fill": (255, 214, 90),  "accent": (255, 244, 206)},
+        "ring": {"fill": (238, 198, 84),  "accent": (226, 92, 122)},
+    },
+    "tool": {
+        "hammer": {"fill": (150, 158, 168), "accent": (142, 98, 60)},
+        "key":    {"fill": (228, 192, 92),  "accent": (186, 144, 64)},
+        "pencil": {"fill": (246, 198, 74),  "accent": (240, 132, 150)},
+        "spoon":  {"fill": (204, 210, 218), "accent": (160, 168, 178)},
+        "fork":   {"fill": (204, 210, 218), "accent": (160, 168, 178)},
+    },
+    "paper": {
+        "book":     {"fill": (194, 84, 94),  "accent": (240, 236, 226)},
+        "scroll":   {"fill": (236, 220, 182), "accent": (198, 162, 112)},
+        "envelope": {"fill": (242, 236, 224), "accent": (214, 92, 96)},
+    },
+    "container": {
+        "bag": {"fill": (208, 172, 118), "accent": (150, 112, 72)},
+        "box": {"fill": (226, 98, 108),  "accent": (250, 240, 230)},
+    },
+}
+
+
 class Props(Generator):
-    """Static objects: rock, bush, chest, mushroom, flower."""
+    """Static objects: 5 classic kinds + the v3 object grammar."""
 
     id = "props"
 
@@ -157,6 +270,466 @@ class Props(Generator):
         cr = r * 0.25
         d.ellipse([cx - cr, cy - cr, cx + cr, cy + cr], fill=(240, 220, 60), outline=(180, 160, 40))
 
+    # ── v3 forms: fruit ────────────────────────────────────────────────
+    def _leaf(self, d: ImageDraw.ImageDraw, lx: float, ly: float, lr: float,
+              ang: float, fill: tuple, ow: int) -> None:
+        pts = []
+        for k in range(12):
+            t = TAU * k / 12
+            x, y = math.cos(t) * lr, math.sin(t) * lr * 0.55
+            pts.append((lx + x * math.cos(ang) - y * math.sin(ang),
+                        ly + x * math.sin(ang) + y * math.cos(ang)))
+        d.polygon(pts, fill=fill, outline=palettes.outline_color(fill),
+                  width=max(1, ow // 2))
+
+    def _apple(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+               vs: int, p: dict, ow: int) -> None:
+        d.ellipse([cx - 0.80 * r, cy - 0.72 * r, cx + 0.80 * r, cy + 0.84 * r],
+                  fill=p["fill"], outline=p["outline"], width=ow)
+        d.line([cx, cy - 0.70 * r, cx + 0.10 * r, cy - 1.0 * r],
+               fill=(118, 84, 52), width=max(2, int(r * 0.09)))
+        self._leaf(d, cx + 0.44 * r, cy - 0.90 * r, 0.30 * r, 0.55,
+                   p["accent"], ow)
+        d.ellipse([cx - 0.46 * r, cy - 0.50 * r, cx - 0.16 * r, cy - 0.22 * r],
+                  fill=_lighten(p["fill"]))
+
+    def _cherry(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                vs: int, p: dict, ow: int) -> None:
+        join = (cx + 0.04 * r, cy - 0.92 * r)
+        balls = [(cx - 0.44 * r, cy + 0.30 * r, 0.46 * r),
+                 (cx + 0.46 * r, cy + 0.42 * r, 0.42 * r)]
+        for bx, by, br in balls:  # stems behind the fruit
+            d.line([bx, by - br * 0.5, join[0], join[1]], fill=(118, 84, 52),
+                   width=max(2, int(r * 0.07)))
+        for bx, by, br in balls:
+            d.ellipse([bx - br, by - br, bx + br, by + br], fill=p["fill"],
+                      outline=p["outline"], width=ow)
+            d.ellipse([bx - br * 0.6, by - br * 0.6, bx - br * 0.2,
+                       by - br * 0.2], fill=_lighten(p["fill"]))
+        self._leaf(d, cx + 0.36 * r, cy - 0.86 * r, 0.24 * r, -0.5,
+                   p["accent"], ow)
+
+    def _banana(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                vs: int, p: dict, ow: int) -> None:
+        n = 12
+        outer, inner = [], []
+        for k in range(n + 1):
+            u = -1.0 + 2.0 * k / n
+            x = cx + u * 0.88 * r
+            y = cy + 0.42 * r - u * u * 0.78 * r
+            thick = 0.30 * r * (0.35 + 0.65 * (1 - u * u))
+            outer.append((x, y))
+            inner.append((x, y - thick))
+        d.polygon(outer + inner[::-1], fill=p["fill"], outline=p["outline"],
+                  width=ow)
+        for u in (-1.0, 1.0):
+            tx, ty = cx + u * 0.86 * r, cy + 0.42 * r - 0.78 * r
+            tr = 0.11 * r
+            d.ellipse([tx - tr, ty - tr, tx + tr, ty + tr],
+                      fill=palettes.darken(p["accent"]))
+
+    def _grapes(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                vs: int, p: dict, ow: int) -> None:
+        gr = 0.24 * r
+        for j, n in enumerate((4, 3, 2, 1)):
+            y = cy - 0.36 * r + j * gr * 1.55
+            for i in range(n):
+                x = cx + (i - (n - 1) / 2) * gr * 1.7
+                d.ellipse([x - gr, y - gr, x + gr, y + gr], fill=p["fill"],
+                          outline=p["outline"], width=max(1, ow // 2))
+        d.line([cx, cy - 0.58 * r, cx + 0.08 * r, cy - 0.96 * r],
+               fill=(118, 84, 52), width=max(2, int(r * 0.08)))
+        self._leaf(d, cx + 0.34 * r, cy - 0.88 * r, 0.24 * r, 0.5,
+                   p["accent"], ow)
+
+    def _strawberry(self, d: ImageDraw.ImageDraw, cx: float, cy: float,
+                    r: float, vs: int, p: dict, ow: int) -> None:
+        n = 8
+        body = []
+        for k in range(n + 1):
+            a = math.pi + math.pi * k / n
+            body.append((cx + math.cos(a) * 0.66 * r,
+                         cy - 0.22 * r + math.sin(a) * 0.52 * r))
+        body.append((cx, cy + 0.88 * r))
+        d.polygon(body, fill=p["fill"], outline=p["outline"], width=ow)
+        for row, halfw in enumerate((0.52 * r, 0.38 * r, 0.22 * r)):
+            y = cy - 0.10 * r + row * 0.30 * r
+            for i in range(3):
+                x = cx + (i - 1) * halfw * 0.72
+                s = max(1, int(r * 0.05))
+                d.rectangle([x - s, y - s, x + s, y + s], fill=(250, 232, 150))
+        for k in range(5):  # calyx fan
+            ang = -math.pi / 2 + (k - 2) * 0.62
+            lx = cx + math.cos(ang) * 0.34 * r
+            ly = cy - 0.52 * r + math.sin(ang) * 0.20 * r
+            self._leaf(d, lx, ly, 0.26 * r, ang, p["accent"], ow)
+        d.line([cx, cy - 0.66 * r, cx + 0.04 * r, cy - 0.94 * r],
+               fill=(118, 84, 52), width=max(2, int(r * 0.07)))
+
+    # ── v3 forms: sweet ────────────────────────────────────────────────
+    def _candy(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+               vs: int, p: dict, ow: int) -> None:
+        acc_out = palettes.outline_color(p["accent"])
+        for side in (-1, 1):
+            x0, x1 = cx + side * 0.52 * r, cx + side * 1.0 * r
+            lo, hi = min(x0, x1), max(x0, x1)
+            d.polygon([(x0, cy - 0.30 * r), (x1, cy - 0.54 * r),
+                       (x1, cy + 0.54 * r), (x0, cy + 0.30 * r)],
+                      fill=p["accent"], outline=acc_out,
+                      width=max(1, ow // 2))
+            d.line([x0, cy - 0.30 * r, x0, cy + 0.30 * r], fill=p["outline"],
+                   width=max(1, ow // 2))
+        _rrect(d, [cx - 0.60 * r, cy - 0.44 * r, cx + 0.60 * r,
+                   cy + 0.44 * r], 0.20 * r, fill=p["fill"],
+               outline=p["outline"], width=ow)
+        d.line([cx - 0.30 * r, cy - 0.18 * r, cx + 0.30 * r, cy - 0.18 * r],
+               fill=_lighten(p["fill"]), width=max(1, int(r * 0.12)))
+
+    def _donut(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+               vs: int, p: dict, ow: int) -> None:
+        R = 0.88 * r
+        d.ellipse([cx - R, cy - R, cx + R, cy + R], fill=p["fill"],
+                  outline=p["outline"], width=ow)
+        ir = 0.80 * r
+        box = [cx - ir, cy - ir - 0.06 * r, cx + ir, cy + ir - 0.06 * r]
+        d.pieslice(box, 165, 375, fill=p["accent"])
+        d.arc(box, 165, 375, fill=palettes.outline_color(p["accent"]),
+              width=max(1, ow))
+        for k in range(6):  # sprinkles on the icing
+            a = math.pi * (1.10 + 0.78 * _rnd(vs, 20 + k))
+            rad = ir * (0.40 + 0.42 * _rnd(vs, 30 + k))
+            sx, sy = cx + math.cos(a) * rad, cy - 0.06 * r + math.sin(a) * rad
+            ex, ey = sx + math.cos(a + 1.3) * 0.10 * r, sy + math.sin(a + 1.3) * 0.10 * r
+            d.line([sx, sy, ex, ey], fill=(255, 255, 255),
+                   width=max(2, int(r * 0.07)))
+        rh = 0.26 * r
+        d.ellipse([cx - rh - ow, cy - rh - ow, cx + rh + ow, cy + rh + ow],
+                  fill=p["outline"])
+        d.ellipse([cx - rh, cy - rh, cx + rh, cy + rh], fill=(0, 0, 0, 0))
+
+    def _cookie(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                vs: int, p: dict, ow: int) -> None:
+        R = 0.86 * r
+        d.ellipse([cx - R, cy - R, cx + R, cy + R], fill=p["fill"],
+                  outline=p["outline"], width=ow)
+        n = 7
+        for k in range(n):
+            a = TAU * k / n + _rnd(vs, 20 + k) * 0.7
+            rad = R * (0.25 + 0.45 * _rnd(vs, 30 + k))
+            sx, sy = cx + math.cos(a) * rad, cy + math.sin(a) * rad
+            cr = r * 0.10
+            d.ellipse([sx - cr, sy - cr, sx + cr, sy + cr], fill=p["accent"])
+
+    def _cupcake(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                 vs: int, p: dict, ow: int) -> None:
+        acc_out = palettes.outline_color(p["accent"])
+        d.polygon([(cx - 0.62 * r, cy + 0.85 * r), (cx - 0.44 * r, cy + 0.02 * r),
+                   (cx + 0.44 * r, cy + 0.02 * r), (cx + 0.62 * r, cy + 0.85 * r)],
+                  fill=p["accent"], outline=acc_out, width=ow)
+        dark = palettes.darken(p["accent"], 0.8)
+        for k in (-1, 0, 1):
+            d.line([cx + k * 0.26 * r, cy + 0.06 * r,
+                    cx + k * 0.40 * r, cy + 0.82 * r], fill=dark,
+                   width=max(1, int(r * 0.07)))
+        for ty, trx, try_ in ((cy + 0.06 * r, 0.56 * r, 0.24 * r),
+                              (cy - 0.22 * r, 0.45 * r, 0.22 * r),
+                              (cy - 0.48 * r, 0.30 * r, 0.18 * r)):
+            d.ellipse([cx - trx, ty - try_, cx + trx, ty + try_],
+                      fill=p["fill"], outline=p["outline"],
+                      width=max(1, ow // 2))
+        cr = 0.13 * r
+        d.ellipse([cx - cr, cy - 0.66 * r - cr, cx + cr, cy - 0.66 * r + cr],
+                  fill=(224, 64, 64), outline=(150, 40, 40),
+                  width=max(1, ow // 2))
+
+    def _lollipop(self, d: ImageDraw.ImageDraw, cx: float, cy: float,
+                  r: float, vs: int, p: dict, ow: int) -> None:
+        _rrect(d, [cx - 0.07 * r, cy + 0.20 * r, cx + 0.07 * r,
+                   cy + 1.05 * r], 0.06 * r,
+               fill=(240, 230, 210), outline=(180, 168, 148),
+               width=max(1, ow // 2))
+        R = 0.62 * r
+        ccy = cy - 0.18 * r
+        d.ellipse([cx - R, ccy - R, cx + R, ccy + R], fill=p["fill"],
+                  outline=p["outline"], width=ow)
+        pts = []
+        for k in range(48):
+            t = k / 47
+            a = TAU * 2.4 * t
+            rad = R * 0.84 * t
+            pts.append((cx + math.cos(a) * rad, ccy + math.sin(a) * rad))
+        d.line(pts, fill=p["accent"], width=max(2, int(r * 0.13)),
+               joint="curve")
+
+    # ── v3 forms: potion ───────────────────────────────────────────────
+    def _bottle(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                vs: int, p: dict, ow: int) -> None:
+        d.rectangle([cx - 0.19 * r, cy - 0.68 * r, cx + 0.19 * r, cy - 0.05 * r],
+                    fill=p["accent"])
+        d.rectangle([cx - 0.23 * r, cy - 0.94 * r, cx + 0.23 * r, cy - 0.62 * r],
+                    fill=(150, 108, 70), outline=(100, 72, 44),
+                    width=max(1, ow // 2))
+        body = [cx - 0.58 * r, cy - 0.12 * r, cx + 0.58 * r, cy + 0.95 * r]
+        _rrect(d, body, 0.18 * r, fill=p["accent"])
+        d.rectangle([cx - 0.48 * r, cy + 0.18 * r, cx + 0.48 * r, cy + 0.87 * r],
+                    fill=p["fill"])
+        d.line([cx - 0.44 * r, cy + 0.20 * r, cx + 0.44 * r, cy + 0.20 * r],
+               fill=palettes.darken(p["fill"], 0.85), width=max(1, ow // 2))
+        _rrect(d, body, 0.18 * r, outline=p["outline"], width=ow)
+        d.rectangle([cx - 0.19 * r, cy - 0.68 * r, cx + 0.19 * r, cy - 0.10 * r],
+                    outline=p["outline"], width=max(1, ow // 2))
+
+    def _flask(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+               vs: int, p: dict, ow: int) -> None:
+        hw0, hw1 = 0.17 * r, 0.78 * r
+        y_top, y_bot = cy - 0.35 * r, cy + 0.90 * r
+        d.rectangle([cx - hw0, cy - 0.82 * r, cx + hw0, y_top + 0.05 * r],
+                    fill=p["accent"])
+        d.rectangle([cx - 0.21 * r, cy - 1.0 * r, cx + 0.21 * r, cy - 0.78 * r],
+                    fill=(150, 108, 70), outline=(100, 72, 44),
+                    width=max(1, ow // 2))
+        body = [(cx - hw0, y_top), (cx - hw1, y_bot), (cx + hw1, y_bot),
+                (cx + hw0, y_top)]
+        d.polygon(body, fill=p["accent"])
+        y0 = cy + 0.25 * r
+        t = (y0 - y_top) / (y_bot - y_top)
+        hw_y = hw0 + (hw1 - hw0) * t
+        d.polygon([(cx - hw_y, y0), (cx - hw1, y_bot), (cx + hw1, y_bot),
+                   (cx + hw_y, y0)], fill=p["fill"])
+        d.line([cx - hw_y, y0, cx + hw_y, y0],
+               fill=palettes.darken(p["fill"], 0.85), width=max(1, ow // 2))
+        for k, bx in enumerate((-0.35, 0.3)):
+            br = r * (0.06 + 0.03 * k)
+            by = y0 + (0.3 + 0.35 * k) * r
+            d.ellipse([cx + bx * r - br, by - br, cx + bx * r + br, by + br],
+                      fill=_lighten(p["fill"], 0.5))
+        d.polygon(body, outline=p["outline"], width=ow)
+        d.rectangle([cx - hw0, cy - 0.82 * r, cx + hw0, y_top],
+                    outline=p["outline"], width=max(1, ow // 2))
+
+    def _vial(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+              vs: int, p: dict, ow: int) -> None:
+        d.rectangle([cx - 0.24 * r, cy - 0.80 * r, cx + 0.24 * r, cy - 0.55 * r],
+                    fill=(150, 108, 70), outline=(100, 72, 44),
+                    width=max(1, ow // 2))
+        body = [cx - 0.30 * r, cy - 0.58 * r, cx + 0.30 * r, cy + 0.95 * r]
+        _rrect(d, body, 0.12 * r, fill=p["accent"])
+        d.rectangle([cx - 0.22 * r, cy + 0.15 * r, cx + 0.22 * r, cy + 0.86 * r],
+                    fill=p["fill"])
+        for k, (bx, by) in enumerate(((-0.06, 0.35), (0.07, 0.55), (-0.02, 0.72))):
+            br = r * 0.05
+            d.ellipse([cx + bx * r - br, cy + by * r - br,
+                       cx + bx * r + br, cy + by * r + br],
+                      fill=_lighten(p["fill"], 0.5))
+        _rrect(d, body, 0.12 * r, outline=p["outline"], width=ow)
+
+    # ── v3 forms: treasure ─────────────────────────────────────────────
+    def _coin(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+              vs: int, p: dict, ow: int) -> None:
+        R = 0.85 * r
+        d.ellipse([cx - R, cy - R, cx + R, cy + R], fill=p["fill"],
+                  outline=p["outline"], width=ow)
+        rim = 0.64 * R
+        d.ellipse([cx - rim, cy - rim, cx + rim, cy + rim],
+                  outline=palettes.darken(p["fill"], 0.72),
+                  width=max(1, ow // 2))
+        emb = 0.42 * R
+        d.polygon(_star_pts(cx, cy, emb, emb * 0.44),
+                  fill=palettes.darken(p["fill"], 0.78))
+
+    def _gem(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+             vs: int, p: dict, ow: int) -> None:
+        pts = [(cx - 0.55 * r, cy - 0.55 * r), (cx + 0.55 * r, cy - 0.55 * r),
+               (cx + 0.78 * r, cy - 0.15 * r), (cx, cy + 0.90 * r),
+               (cx - 0.78 * r, cy - 0.15 * r)]
+        d.polygon(pts, fill=p["fill"], outline=p["outline"], width=ow)
+        lite = _lighten(p["fill"], 0.4)
+        d.line([cx - 0.78 * r, cy - 0.15 * r, cx + 0.78 * r, cy - 0.15 * r],
+               fill=palettes.darken(p["fill"], 0.72), width=max(1, ow // 2))
+        for x in (-0.55, -0.18, 0.18, 0.55):
+            d.line([cx + x * r, cy - 0.55 * r, cx + x * 0.35 * r, cy - 0.15 * r],
+                   fill=lite, width=max(1, ow // 2))
+        d.line([cx, cy - 0.15 * r, cx, cy + 0.90 * r], fill=lite,
+               width=max(1, ow // 2))
+        d.polygon([(cx - 0.42 * r, cy - 0.46 * r), (cx - 0.08 * r, cy - 0.46 * r),
+                   (cx - 0.22 * r, cy - 0.22 * r), (cx - 0.52 * r, cy - 0.22 * r)],
+                  fill=lite)
+
+    def _star(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+              vs: int, p: dict, ow: int) -> None:
+        d.polygon(_star_pts(cx, cy, 0.92 * r, 0.42 * r), fill=p["fill"],
+                  outline=p["outline"], width=ow)
+        cr = 0.14 * r
+        d.ellipse([cx - cr, cy - cr, cx + cr, cy + cr],
+                  fill=_lighten(p["fill"], 0.5))
+
+    def _ring(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+              vs: int, p: dict, ow: int) -> None:
+        band_y = cy + 0.24 * r
+        bo = 0.62 * r
+        d.ellipse([cx - bo, band_y - bo, cx + bo, band_y + bo], fill=p["fill"],
+                  outline=p["outline"], width=ow)
+        bi = 0.42 * r
+        d.ellipse([cx - bi - ow, band_y - bi - ow, cx + bi + ow, band_y + bi + ow],
+                  fill=p["outline"])
+        d.ellipse([cx - bi, band_y - bi, cx + bi, band_y + bi], fill=(0, 0, 0, 0))
+        gem = [(cx, cy - 0.85 * r), (cx + 0.27 * r, cy - 0.55 * r),
+               (cx, cy - 0.30 * r), (cx - 0.27 * r, cy - 0.55 * r)]
+        d.polygon(gem, fill=p["accent"], outline=palettes.outline_color(p["accent"]),
+                  width=ow)
+        d.polygon([(cx, cy - 0.80 * r), (cx + 0.10 * r, cy - 0.58 * r),
+                   (cx - 0.06 * r, cy - 0.55 * r)], fill=_lighten(p["accent"], 0.5))
+
+    # ── v3 forms: tool ─────────────────────────────────────────────────
+    def _hammer(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                vs: int, p: dict, ow: int) -> None:
+        acc_out = palettes.outline_color(p["accent"])
+        _rrect(d, [cx - 0.10 * r, cy - 0.35 * r, cx + 0.10 * r,
+                   cy + 0.98 * r], 0.08 * r, fill=p["accent"],
+               outline=acc_out, width=ow)
+        _rrect(d, [cx - 0.75 * r, cy - 0.82 * r, cx + 0.75 * r,
+                   cy - 0.32 * r], 0.10 * r, fill=p["fill"],
+               outline=p["outline"], width=ow)
+        d.line([cx + 0.44 * r, cy - 0.76 * r, cx + 0.44 * r, cy - 0.38 * r],
+               fill=palettes.darken(p["fill"], 0.78), width=max(1, ow // 2))
+
+    def _key(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+             vs: int, p: dict, ow: int) -> None:
+        br = 0.40 * r
+        by = cy - 0.55 * r
+        d.ellipse([cx - br, by - br, cx + br, by + br], fill=p["fill"],
+                  outline=p["outline"], width=ow)
+        hr = 0.18 * r
+        d.ellipse([cx - hr - ow, by - hr - ow, cx + hr + ow, by + hr + ow],
+                  fill=p["outline"])
+        d.ellipse([cx - hr, by - hr, cx + hr, by + hr], fill=(0, 0, 0, 0))
+        d.rectangle([cx - 0.10 * r, cy - 0.32 * r, cx + 0.10 * r, cy + 0.95 * r],
+                    fill=p["fill"], outline=p["outline"], width=ow)
+        for ty in (0.38 * r, 0.68 * r):
+            d.rectangle([cx + 0.10 * r, cy + ty - 0.10 * r,
+                         cx + 0.38 * r, cy + ty + 0.10 * r], fill=p["fill"],
+                        outline=p["outline"], width=max(1, ow // 2))
+
+    def _pencil(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                vs: int, p: dict, ow: int) -> None:
+        W = 0.17 * r
+        d.rectangle([cx - W, cy - 0.64 * r, cx + W, cy + 0.50 * r],
+                    fill=p["fill"], outline=p["outline"], width=ow)
+        d.polygon([(cx - W, cy + 0.50 * r), (cx + W, cy + 0.50 * r),
+                   (cx, cy + 0.85 * r)], fill=(230, 202, 158),
+                  outline=p["outline"], width=max(1, ow // 2))
+        d.polygon([(cx - 0.06 * r, cy + 0.72 * r), (cx + 0.06 * r, cy + 0.72 * r),
+                   (cx, cy + 0.95 * r)], fill=(48, 44, 42))
+        d.rectangle([cx - W, cy - 0.78 * r, cx + W, cy - 0.62 * r],
+                    fill=(178, 184, 194), outline=(120, 126, 136),
+                    width=max(1, ow // 2))
+        d.rectangle([cx - W, cy - 0.98 * r, cx + W, cy - 0.76 * r],
+                    fill=p["accent"], outline=palettes.outline_color(p["accent"]),
+                    width=max(1, ow // 2))
+        d.line([cx - 0.06 * r, cy - 0.56 * r, cx - 0.06 * r, cy + 0.42 * r],
+               fill=_lighten(p["fill"], 0.4), width=max(1, int(r * 0.08)))
+
+    def _spoon(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+               vs: int, p: dict, ow: int) -> None:
+        W = 0.09 * r
+        _rrect(d, [cx - W, cy - 0.05 * r, cx + W, cy + 0.98 * r],
+               W, fill=p["fill"], outline=p["outline"], width=ow)
+        bw, bh = 0.36 * r, 0.50 * r
+        top = cy - 0.98 * r
+        d.ellipse([cx - bw, top, cx + bw, top + 2 * bh], fill=p["fill"],
+                  outline=p["outline"], width=ow)
+        iw, ih = bw * 0.6, bh * 0.6
+        d.ellipse([cx - iw, top + bh - ih, cx + iw, top + bh + ih],
+                  fill=_lighten(p["fill"], 0.3))
+
+    def _fork(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+              vs: int, p: dict, ow: int) -> None:
+        W = 0.09 * r
+        _rrect(d, [cx - W, cy - 0.15 * r, cx + W, cy + 0.98 * r],
+               W, fill=p["fill"], outline=p["outline"], width=ow)
+        hw = 0.38 * r
+        d.rectangle([cx - hw, cy - 0.98 * r, cx + hw, cy - 0.45 * r],
+                    fill=p["fill"], outline=p["outline"], width=ow)
+        gap = 0.05 * r
+        for k in (-1, 1):
+            gx = cx + k * 0.17 * r
+            d.rectangle([gx - gap, cy - 1.04 * r, gx + gap, cy - 0.62 * r],
+                        fill=(0, 0, 0, 0))
+
+    # ── v3 forms: paper ────────────────────────────────────────────────
+    def _book(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+              vs: int, p: dict, ow: int) -> None:
+        cover = [cx - 0.72 * r, cy - 0.55 * r, cx + 0.72 * r, cy + 0.68 * r]
+        d.rectangle(cover, fill=p["fill"])
+        d.rectangle([cx + 0.50 * r, cy - 0.48 * r, cx + 0.72 * r, cy + 0.60 * r],
+                    fill=p["accent"])
+        d.rectangle([cx - 0.72 * r, cy - 0.55 * r, cx - 0.50 * r, cy + 0.68 * r],
+                    fill=palettes.darken(p["fill"], 0.78))
+        d.rectangle([cx - 0.36 * r, cy - 0.16 * r, cx + 0.36 * r, cy + 0.06 * r],
+                    fill=_lighten(p["fill"], 0.35))
+        d.rectangle(cover, outline=p["outline"], width=ow)
+        d.line([cx - 0.50 * r, cy - 0.55 * r, cx - 0.50 * r, cy + 0.68 * r],
+               fill=p["outline"], width=max(1, ow // 2))
+
+    def _scroll(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                vs: int, p: dict, ow: int) -> None:
+        sheet = [cx - 0.66 * r, cy - 0.52 * r, cx + 0.66 * r, cy + 0.52 * r]
+        d.rectangle(sheet, fill=p["fill"], outline=p["outline"],
+                    width=max(1, ow // 2))
+        for k in range(3):
+            y = cy - 0.22 * r + k * 0.24 * r
+            d.line([cx - 0.44 * r, y, cx + 0.44 * r, y],
+                   fill=palettes.darken(p["fill"], 0.68),
+                   width=max(1, int(r * 0.06)))
+        for y0, y1 in ((cy - 0.78 * r, cy - 0.46 * r), (cy + 0.46 * r, cy + 0.78 * r)):
+            _rrect(d, [cx - 0.76 * r, y0, cx + 0.76 * r, y1], 0.14 * r,
+                   fill=p["accent"],
+                   outline=palettes.outline_color(p["accent"]), width=ow)
+
+    def _envelope(self, d: ImageDraw.ImageDraw, cx: float, cy: float,
+                  r: float, vs: int, p: dict, ow: int) -> None:
+        ev = [cx - 0.78 * r, cy - 0.50 * r, cx + 0.78 * r, cy + 0.50 * r]
+        d.rectangle(ev, fill=p["fill"], outline=p["outline"], width=ow)
+        d.polygon([(cx - 0.78 * r, cy - 0.50 * r), (cx, cy + 0.08 * r),
+                   (cx + 0.78 * r, cy - 0.50 * r)], fill=_lighten(p["fill"], 0.25),
+                  outline=p["outline"], width=ow)
+        sx, sy = cx + 0.42 * r, cy + 0.16 * r
+        d.rectangle([sx, sy, sx + 0.24 * r, sy + 0.24 * r], fill=p["accent"],
+                    outline=palettes.outline_color(p["accent"]),
+                    width=max(1, ow // 2))
+
+    # ── v3 forms: container ────────────────────────────────────────────
+    def _bag(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+             vs: int, p: dict, ow: int) -> None:
+        d.ellipse([cx - 0.64 * r, cy - 0.30 * r, cx + 0.64 * r, cy + 0.95 * r],
+                  fill=p["fill"], outline=p["outline"], width=ow)
+        d.polygon([(cx - 0.32 * r, cy - 0.20 * r), (cx - 0.18 * r, cy - 0.62 * r),
+                   (cx + 0.18 * r, cy - 0.62 * r), (cx + 0.32 * r, cy - 0.20 * r)],
+                  fill=p["fill"], outline=p["outline"], width=ow)
+        d.ellipse([cx - 0.26 * r, cy - 0.98 * r, cx + 0.26 * r, cy - 0.52 * r],
+                  fill=p["fill"], outline=p["outline"], width=ow)
+        _rrect(d, [cx - 0.36 * r, cy - 0.58 * r, cx + 0.36 * r,
+                   cy - 0.42 * r], 0.06 * r, fill=p["accent"],
+               outline=palettes.outline_color(p["accent"]),
+               width=max(1, ow // 2))
+
+    def _box(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+             vs: int, p: dict, ow: int) -> None:
+        d.rectangle([cx - 0.60 * r, cy - 0.10 * r, cx + 0.60 * r, cy + 0.80 * r],
+                    fill=p["fill"], outline=p["outline"], width=ow)
+        d.rectangle([cx - 0.68 * r, cy - 0.52 * r, cx + 0.68 * r, cy - 0.06 * r],
+                    fill=_lighten(p["fill"], 0.2), outline=p["outline"],
+                    width=ow)
+        d.rectangle([cx - 0.10 * r, cy - 0.52 * r, cx + 0.10 * r, cy + 0.80 * r],
+                    fill=p["accent"])
+        acc_out = palettes.outline_color(p["accent"])
+        for x0, x1 in ((cx - 0.44 * r, cx - 0.08 * r), (cx + 0.08 * r, cx + 0.44 * r)):
+            d.ellipse([x0, cy - 0.78 * r, x1, cy - 0.50 * r], fill=p["accent"],
+                      outline=acc_out, width=max(1, ow // 2))
+        d.rectangle([cx - 0.10 * r, cy - 0.66 * r, cx + 0.10 * r,
+                     cy - 0.54 * r], fill=p["accent"],
+                    outline=acc_out, width=max(1, ow // 2))
+
 
     def generate(
         self,
@@ -167,23 +740,49 @@ class Props(Generator):
         base: int = 0,
     ) -> list[FrameData]:
         kind = params.get("kind", "rock")
-        if kind not in self.KIND_DEFAULTS:
+        if kind not in FORMS:
             raise ValueError(
                 f"invalid props.kind '{kind}' "
-                f"(available: {', '.join(sorted(self.KIND_DEFAULTS))})"
+                f"(available: {', '.join(sorted(FORMS))})"
             )
-        palette: dict = dict(self.KIND_DEFAULTS[kind])
-        for k, v in params.items():
-            if isinstance(v, list) and len(v) == 3 and k in ("fill", "outline"):
-                palette[k] = tuple(int(c) for c in v)
+        form = str(params.get("form", "auto"))
+        vocab = FORMS[kind]
+        if form not in vocab:
+            raise ValueError(
+                f"invalid props.form '{form}' for kind '{kind}' "
+                f"(available: {', '.join(vocab)})"
+            )
+        overrides = {
+            k: tuple(int(c) for c in v)
+            for k, v in params.items()
+            if k in ("fill", "accent", "outline")
+            and isinstance(v, list) and len(v) == 3
+        }
+        ow = palettes.outline_width(frame_px)
 
         out: list[FrameData] = []
         for i in range(count):
             vs = (seed * 1000 + base + i) % 2**31
+            if kind in FORMLESS:
+                chosen = None
+                p = dict(self.KIND_DEFAULTS[kind])
+            else:
+                options = vocab[1:]
+                chosen = (
+                    form if form != "auto"
+                    else options[int(_rnd(vs, 15) * len(options)) % len(options)]
+                )
+                p = dict(FORM_COLORS[kind][chosen])
+            p.update(overrides)
+            if "outline" not in p:
+                p["outline"] = palettes.outline_color(p["fill"])
             img = Image.new("RGBA", (frame_px, frame_px), (0, 0, 0, 0))
             d = ImageDraw.Draw(img)
             cx = cy = frame_px / 2
             r = frame_px * 0.35
-            getattr(self, f"_{kind}")(d, cx, cy, r, vs, palette)
+            if chosen is None:
+                getattr(self, f"_{kind}")(d, cx, cy, r, vs, p)
+            else:
+                getattr(self, f"_{chosen}")(d, cx, cy, r, vs, p, ow)
             out.append(FrameData(id="", image=img, meta={"anchor": _anchor_from_alpha(img)}))
         return out
