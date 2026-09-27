@@ -84,7 +84,47 @@ Schema + plugin validation only (no rendering). Fast pre-commit check.
 
 ```bash
 sprout validate specs/demo.json
+
+# Coverage: fail (exit 1) if any catalog id has no frame — CI check.
+sprout validate specs/catalog.json --coverage catalog.ts --field key
+sprout validate specs/catalog.json --coverage catalog.ts --field key --map mapping.json
 ```
+
+`--map` is optional; its `skip` ids are excluded from the expected set.
+
+### `sprout catalog <file>`
+
+Codegen: emit a spec from a catalog file (`.json` list, or a `.ts`/`.js`
+list of flat object literals) + an external `mapping.json`. The toolkit
+has no domain knowledge — every set/id rule lives in your mapping.
+
+```bash
+sprout catalog catalog.ts --field key --map mapping.json --out specs/catalog.json
+sprout catalog items.json --field id --generator props --seed 7
+```
+
+`mapping.json` (your side of the fence):
+
+```json
+{
+  "sets": {
+    "pets": { "generator": "critter", "frames": 4,
+              "params": { "archetype": "quadruped" } },
+    "glyphs": { "generator": "font" }
+  },
+  "ids": {
+    "coin": { "generator": "props",
+              "params": { "kind": "treasure", "form": "coin" } }
+  },
+  "default": { "generator": "props" },
+  "skip": ["hand-drawn-id"]
+}
+```
+
+Resolution per record: `ids[id]` > `sets[record.set]` > `default` >
+error. `--generator` is the fallback when no `--map` is given.
+`--set-field` selects the record field carrying the set name
+(default `set`). Item ids are always the extracted field values.
 
 ## Export options (`generate` / `batch`)
 

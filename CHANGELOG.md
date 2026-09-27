@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`sprout catalog <file> --field <name> --map mapping.json`**: codegen
+  from any catalog (`.json` list or flat-object `.ts` list) — extracts
+  ids and materializes a spec by applying an external mapping
+  (`sets`/`ids`/`default` rules + `skip` list). The toolkit stays
+  domain-free: the mapping lives on the consumer's side.
+  Companion flag **`sprout validate --coverage`**: fails (exit 1) when a
+  catalog id has no frame — the CI coverage check. Tests: `test_catalog.py`.
 - **`props` v3 object grammar**: the generator gains a `form` param and
   seven new kinds covering flavor/thing catalog sets — `fruit` (5),
   `sweet` (5), `potion` (3), `treasure` (4), `tool` (5), `paper` (3),

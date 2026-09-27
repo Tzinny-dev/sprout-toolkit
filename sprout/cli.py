@@ -9,6 +9,8 @@ Usage:
   sprout lint specs/demo.json [--json]
   sprout diff <a> <b> [--json]
   sprout validate specs/demo.json
+  sprout validate specs/demo.json --coverage catalog.ts --field key --map mapping.json
+  sprout catalog catalog.ts --field key --map mapping.json --out specs/catalog.json
   sprout init --out ./assets/starter   # copy the starter spec + tutorial
 """
 from __future__ import annotations
@@ -22,6 +24,7 @@ from pathlib import Path
 import typer
 
 from . import __version__
+from . import catalog as catalog_mod
 from .exporter import (
     apply_png_mode,
     build_autotile_map,
@@ -225,18 +228,85 @@ def batch(
 
 
 @app.command()
-def validate(spec: Path = typer.Argument(..., help="spec.json to validate")) -> None:
-    """Validate a spec's structure and plugins."""
+def validate(
+    spec: Path = typer.Argument(..., help="spec.json to validate"),
+    coverage_file: Path = typer.Option(None, "--coverage",
+                                       help="catalog file: fail if any id has no frame"),
+    field: str = typer.Option(None, "--field",
+                              help="id field in the coverage catalog"),
+    map_path: Path = typer.Option(None, "--map",
+                                  help="mapping.json (its 'skip' ids are excluded)"),
+) -> None:
+    """Validate a spec's structure, plugins, and catalog coverage."""
     try:
         s = load_spec(spec)
     except SpecError as e:
         typer.secho(f"invalid: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
+    if coverage_file is not None and field is None:
+        typer.secho("--field is required with --coverage",
+                    fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    if coverage_file is not None:
+        try:
+            mapping = catalog_mod.load_mapping(map_path)
+            expected, missing = catalog_mod.coverage(
+                spec, coverage_file, field, mapping=mapping)
+        except catalog_mod.CatalogError as e:
+            typer.secho(f"coverage error: {e}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+        if missing:
+            shown = ", ".join(missing[:10])
+            extra = f" (+{len(missing) - 10} more)" if len(missing) > 10 else ""
+            typer.secho(
+                f"coverage {len(expected) - len(missing)}/{len(expected)} — "
+                f"missing frames: {shown}{extra}",
+                fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+        typer.secho(f"coverage {len(expected)}/{len(expected)}",
+                    fg=typer.colors.GREEN)
     typer.secho(
         f"[{s.name}] OK — items={[i.id for i in s.items]} "
         f"frames={s.total_frames} seed={s.seed}",
         fg=typer.colors.GREEN,
     )
+
+
+@app.command()
+def catalog(
+    file: Path = typer.Argument(...,
+                                help="catalog file (.json or .ts) to extract ids from"),
+    field: str = typer.Option(..., "--field",
+                              help="record field carrying the unique id"),
+    map_path: Path = typer.Option(None, "--map",
+                                  help="mapping.json: sets/ids → generator + params"),
+    generator: str = typer.Option(None, "--generator",
+                                  help="fallback generator when no --map is given"),
+    set_field: str = typer.Option("set", "--set-field",
+                                  help="record field carrying the set name"),
+    out: Path = typer.Option(None, "--out", "-o",
+                             help="output spec path (default: specs/<name>.json)"),
+    name: str = typer.Option(None, "--name",
+                             help="spec name (default: <file stem>_catalog)"),
+    seed: int = typer.Option(0, "--seed", help="spec seed"),
+    frame_px: int = typer.Option(64, "--frame-px", help="frame size in px"),
+) -> None:
+    """Emit a spec from a catalog file + an external mapping.json."""
+    try:
+        records = catalog_mod.extract_records(file, field)
+        mapping = catalog_mod.load_mapping(map_path)
+        items = catalog_mod.resolve_items(
+            records, field, mapping, set_field=set_field,
+            fallback_generator=generator)
+    except catalog_mod.CatalogError as e:
+        typer.secho(f"catalog error: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+    spec_name = name or f"{file.stem}_catalog"
+    spec = catalog_mod.build_spec(items, name=spec_name, seed=seed,
+                                  frame_px=frame_px)
+    dest = out or (Path("specs") / f"{spec_name}.json")
+    catalog_mod.write_spec(spec, dest)
+    typer.secho(f"[catalog] {len(items)} ids -> {dest}", fg=typer.colors.GREEN)
 
 
 @app.command()

@@ -53,6 +53,7 @@ sprout/
 | **Bitmap fonts from TTF** | Glyph atlas with advance metrics, ready for text layout. |
 | **Runtime SkSL shaders** | Generated Skia shaders (FBM value-noise, tileable), no bundle weight added. |
 | **Spec introspection** | `sprout info`/`sprout lint`/`sprout diff` to inspect, validate quality, and compare builds. |
+| **Catalog codegen** | `sprout catalog` + `validate --coverage`: specs from any catalog file via an external `mapping.json`. |
 | **Flexible export** | PNG8/PNG24, TexturePacker format, atlas mipmaps — all opt-in. |
 
 ## Showcase
@@ -131,6 +132,12 @@ sprout diff --json ./out/a ./out/b
 
 # Validate a spec
 sprout validate specs/demo.json
+
+# Coverage: fail if any catalog id has no frame (CI check)
+sprout validate specs/catalog.json --coverage catalog.ts --field key --map mapping.json
+
+# Codegen: catalog file + external mapping.json -> spec
+sprout catalog catalog.ts --field key --map mapping.json --out specs/catalog.json
 ```
 
 ### Export options (`generate` / `batch`)
