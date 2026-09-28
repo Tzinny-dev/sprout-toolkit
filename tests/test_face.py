@@ -175,7 +175,9 @@ def test_wink_is_one_eyed() -> None:
 def test_face_is_mirrored_around_center() -> None:
     """No extras (they break symmetry): head + eyes + mouth are symmetric.
     Not byte-exact — arc/Bresenham strokes rasterize asymmetrically — but a
-    lopsided feature blows the budget."""
+    lopsided feature blows the budget. The budget scales with feature size:
+    rasterization noise grows with area, while a feature drawn on one side
+    only shifts its whole count to the other."""
     from collections import Counter
 
     frame = Face().generate(4, 1, 64, {"mood": "neutral"})[0].image
@@ -187,7 +189,8 @@ def test_face_is_mirrored_around_center() -> None:
                 continue
             (left if x < 32 else right)[px[:3]] += 1
     for color in set(left) | set(right):
-        assert abs(left[color] - right[color]) <= 16, color
+        budget = max(16, int(0.08 * max(left[color], right[color])))
+        assert abs(left[color] - right[color]) <= budget, color
 
 
 # ── Palette: overrides ─────────────────────────────────────────────────

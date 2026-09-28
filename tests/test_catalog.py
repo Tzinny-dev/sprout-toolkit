@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -289,7 +290,7 @@ def test_coverage_requires_field(tmp_path: Path) -> None:
     spec = _make_spec(tmp_path, ["paw"])
     r = runner.invoke(app, ["validate", str(spec), "--coverage", str(cat)])
     assert r.exit_code == 1
-    assert "--field" in r.output
+    assert "--field" in re.sub(r"\x1b\[[0-9;]*m", "", r.output)
 
 
 def test_validate_without_coverage_unchanged(tmp_path: Path) -> None:

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import zlib
 from pathlib import Path
 
@@ -12,6 +13,12 @@ from sprout.cli import app
 
 SPEC = Path(__file__).resolve().parents[1] / "specs" / "demo.json"
 runner = CliRunner()
+
+
+def _plain(output: str) -> str:
+    """Strip ANSI SGR codes — typer/rich highlight flag names with colors on
+    (e.g. '-\\x1b[0m\\x1b[1;36m-tiers'), splitting '--tiers' across escapes."""
+    return re.sub(r"\x1b\[[0-9;]*m", "", output)
 
 
 def _crc(p: Path) -> int:
@@ -34,7 +41,7 @@ def test_frame_px_invalid_exits_1(tmp_path: Path) -> None:
     r = runner.invoke(app, ["generate", str(SPEC), "-o", str(tmp_path),
                             "--frame-px", "4"])
     assert r.exit_code == 1
-    assert "--frame-px" in r.output
+    assert "--frame-px" in _plain(r.output)
 
 
 # ── --tiers (one atlas per resolution + combined index.ts) ─────────────
@@ -97,7 +104,7 @@ def test_invalid_tiers_value(tmp_path: Path) -> None:
     r = runner.invoke(app, ["generate", str(SPEC), "-o", str(tmp_path),
                             "--tiers", "abc"])
     assert r.exit_code != 0
-    assert "--tiers" in r.output
+    assert "--tiers" in _plain(r.output)
 
 
 # ── --silhouette (prebaked black x alpha mask) ─────────────────────────
