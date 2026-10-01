@@ -17,13 +17,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   exiting non-zero (default exits 1 on collision, for CI). Generic: no
   generator knowledge, works for any catalog. Tests: `test_diversity.py`
   (34).
-- **Data-driven vocabularies**: `props` and `face` load their forms and
-  colors from `assets/vocab/*.json` instead of hardcoding them, so a
-  consumer can extend the toolkit's vocabulary without forking it.
+- **Data-driven vocabularies**: `props`, `face`, `critter` and `flora` load
+  their word lists from `assets/vocab/*.json` instead of hardcoding them, so
+  a consumer can extend the toolkit's vocabulary without forking it.
   `SPROUT_VOCAB_DIR` points at a directory of same-named JSON files that
   deep-merge over the packaged defaults (lists replace, dicts merge
   recursively). Colors normalize from JSON `[r,g,b]` to the tuples PIL
-  requires. Tests: `test_vocab.py` (23).
+  requires. Each generator moves the tables its options only mean something
+  with: `critter` ships the per-archetype `auto` pick table and `flora` the
+  per-age `age_mods` numbers, so extending a vocabulary cannot leave a value
+  the renderer has no branch for. Purely a data move — all 13 bundled specs
+  generate byte-identical atlases. Tests: `test_vocab.py` (23).
 - **Unknown-param validation**: every built-in generator declares the
   `item.params` keys it reads (`Generator.PARAMS`), and the spec loader
   rejects anything else. A typo in a hand-written `mapping.json` — the

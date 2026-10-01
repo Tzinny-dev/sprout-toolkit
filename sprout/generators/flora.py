@@ -31,39 +31,35 @@ import math
 from PIL import Image, ImageDraw
 
 from .. import palettes
+from .. import vocab as vocab_mod
 from .base import FrameData, Generator
 from .props import _anchor_from_alpha, _rnd
 
 TAU = math.tau
 
-KINDS = ("tree", "plant")
-CANOPY = ("auto", "round", "columnar", "conifer")
-TRUNK = ("auto", "straight", "gnarled")
-AGES = ("auto", "sapling", "young", "mature", "old")
-FORMS = ("auto", "fern", "sprout", "grass", "blossom")
+# Loaded from assets/vocab/flora.json so consumers can extend the plant
+# vocabulary without forking the toolkit (see sprout/vocab.py).
+_vocab = vocab_mod.load("flora")
+
+KINDS = tuple(_vocab["kinds"])
+CANOPY = tuple(_vocab["canopy"])
+TRUNK = tuple(_vocab["trunk"])
+AGES = tuple(_vocab["ages"])
+FORMS = tuple(_vocab["forms"])
 
 # Maturity stages scale the seeded proportions of a tree. ``mature`` is all
 # 1.0, so it reproduces the historical proportions exactly: an item that pins
-# ``age: mature`` keeps the look it had before the param existed.
-_AGE_MODS = {
-    "sapling": {"trunk_h": 0.55, "trunk_w": 0.60, "canopy_r": 0.66,
-                "branches": 0.50, "n_lobes": 0.85, "lean": 0.60,
-                "kink": 0.60, "fruit_p": 0.0},
-    "young":   {"trunk_h": 0.82, "trunk_w": 0.84, "canopy_r": 0.88,
-                "branches": 0.75, "n_lobes": 0.95, "lean": 0.85,
-                "kink": 0.85, "fruit_p": 0.0},
-    "mature":  {"trunk_h": 1.00, "trunk_w": 1.00, "canopy_r": 1.00,
-                "branches": 1.00, "n_lobes": 1.00, "lean": 1.00,
-                "kink": 1.00, "fruit_p": 1.0},
-    "old":     {"trunk_h": 0.90, "trunk_w": 1.40, "canopy_r": 1.14,
-                "branches": 1.30, "n_lobes": 1.15, "lean": 1.45,
-                "kink": 1.50, "fruit_p": 1.7},
-}
+# ``age: mature`` keeps the look it had before the param existed. It sits in
+# the vocab next to ``ages`` so a new stage arrives with its numbers attached
+# instead of KeyError-ing at render time.
+_AGE_MODS = _vocab["age_mods"]
 
 SWAY_AMP = 0.028       # fraction of frame_px
 CANOPY_MARGIN = 0.10   # keep the canopy tip >= 10% below the frame top
 
-_PLANT_FORMS = ("fern", "sprout", "grass", "blossom")
+# What the seed can pick: FORMS without the "auto" opt-out. Derived so the two
+# cannot drift apart when the vocab is overridden.
+_PLANT_FORMS = tuple(f for f in FORMS if f != "auto")
 
 
 def _pick(opts: tuple[str, ...], vs: int, salt: int) -> str:

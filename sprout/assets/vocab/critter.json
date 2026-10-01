@@ -1,0 +1,54 @@
+{
+  "archetypes": ["quadruped", "bird", "fish", "reptile", "bug"],
+  "facings": ["right", "left"],
+  "parts": {
+    "ears": ["auto", "none", "round", "pointy", "long"],
+    "snout": ["auto", "none", "short", "long", "beak"],
+    "tail": ["auto", "none", "short", "long", "bushy", "fan"],
+    "legs": ["auto", "none", "stubby", "thin", "splayed"],
+    "wings": ["auto", "none", "small", "spread"],
+    "pattern": ["auto", "none", "spots", "stripes", "patch"]
+  },
+  "auto": {
+    "quadruped": {
+      "ears": ["round", "pointy"],
+      "snout": ["short", "long"],
+      "tail": ["short", "bushy"],
+      "legs": ["stubby"],
+      "wings": ["none"],
+      "pattern": ["none", "spots", "stripes", "patch"]
+    },
+    "bird": {
+      "ears": ["none"],
+      "snout": ["beak"],
+      "tail": ["fan"],
+      "legs": ["thin"],
+      "wings": ["small", "spread"],
+      "pattern": ["none", "stripes"]
+    },
+    "fish": {
+      "ears": ["none"],
+      "snout": ["none"],
+      "tail": ["fan"],
+      "legs": ["none"],
+      "wings": ["none"],
+      "pattern": ["none", "spots", "stripes"]
+    },
+    "reptile": {
+      "ears": ["none"],
+      "snout": ["short"],
+      "tail": ["long", "short"],
+      "legs": ["splayed"],
+      "wings": ["none"],
+      "pattern": ["none", "stripes", "patch"]
+    },
+    "bug": {
+      "ears": ["none"],
+      "snout": ["none"],
+      "tail": ["none"],
+      "legs": ["thin"],
+      "wings": ["none", "small"],
+      "pattern": ["none"]
+    }
+  }
+}

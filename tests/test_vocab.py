@@ -1,7 +1,10 @@
 """Tests for data-driven vocabularies (sprout/vocab.py + assets/vocab/*.json)."""
 from __future__ import annotations
 
+import contextlib
+import importlib
 import json
+import sys
 
 import pytest
 
@@ -35,6 +38,79 @@ def test_face_part_vocabularies_match_packaged_json():
     data = json.loads((vocab.ASSETS_DIR / "face.json").read_text())
     assert list(HEADS) == data["heads"]
     assert list(EYES) == data["eyes"]
+
+
+def test_critter_parts_match_packaged_json():
+    from sprout.generators.critter import (
+        ARCHETYPES, EARS, FACINGS, LEGS, PATTERNS, SNOUT, TAIL, WINGS,
+    )
+    data = json.loads((vocab.ASSETS_DIR / "critter.json").read_text())
+    assert list(ARCHETYPES) == data["archetypes"]
+    assert list(FACINGS) == data["facings"]
+    assert list(EARS) == data["parts"]["ears"]
+    assert list(SNOUT) == data["parts"]["snout"]
+    assert list(TAIL) == data["parts"]["tail"]
+    assert list(LEGS) == data["parts"]["legs"]
+    assert list(WINGS) == data["parts"]["wings"]
+    assert list(PATTERNS) == data["parts"]["pattern"]
+
+
+def test_critter_auto_table_matches_packaged_json():
+    """The per-archetype pick table travels with the word lists: an option
+    only means something if some archetype can pick it."""
+    from sprout.generators.critter import _AUTO
+    data = json.loads((vocab.ASSETS_DIR / "critter.json").read_text())
+    assert {a: {p: list(o) for p, o in parts.items()}
+            for a, parts in _AUTO.items()} == data["auto"]
+
+
+def test_flora_parts_match_packaged_json():
+    from sprout.generators.flora import AGES, CANOPY, FORMS, KINDS, TRUNK
+    data = json.loads((vocab.ASSETS_DIR / "flora.json").read_text())
+    assert list(KINDS) == data["kinds"]
+    assert list(CANOPY) == data["canopy"]
+    assert list(TRUNK) == data["trunk"]
+    assert list(AGES) == data["ages"]
+    assert list(FORMS) == data["forms"]
+
+
+def test_flora_age_mods_match_packaged_json():
+    from sprout.generators.flora import _AGE_MODS
+    data = json.loads((vocab.ASSETS_DIR / "flora.json").read_text())
+    assert _AGE_MODS == data["age_mods"]
+
+
+def test_flora_plant_forms_are_forms_without_auto():
+    """Derived, so the seed's option list cannot drift from the vocabulary."""
+    from sprout.generators.flora import FORMS, _PLANT_FORMS
+    assert _PLANT_FORMS == tuple(f for f in FORMS if f != "auto")
+    assert "auto" not in _PLANT_FORMS
+
+
+@contextlib.contextmanager
+def _vocab_override(tmp_path, monkeypatch, **files):
+    """Point SPROUT_VOCAB_DIR at ``files`` and reload those generators,
+    restoring the packaged defaults on the way out.
+
+    ``importlib.reload`` mutates module globals for the rest of the session,
+    so the exit path reloads again with the env var gone; without it a later
+    test would silently inherit another test's vocabulary.
+    """
+    for name, data in files.items():
+        (tmp_path / f"{name}.json").write_text(json.dumps(data))
+    monkeypatch.setenv(vocab.OVERRIDE_ENV, str(tmp_path))
+    importlib.reload(sys.modules["sprout.vocab"])
+    mods = {}
+    for name in files:
+        mod = importlib.import_module(f"sprout.generators.{name}")
+        mods[name] = importlib.reload(mod)
+    try:
+        yield mods
+    finally:
+        monkeypatch.delenv(vocab.OVERRIDE_ENV, raising=False)
+        importlib.reload(sys.modules["sprout.vocab"])
+        for mod in mods.values():
+            importlib.reload(mod)
 
 
 def test_load_returns_normalized_tuples():
@@ -226,3 +302,58 @@ def test_props_new_form_without_renderer_fails_loudly(monkeypatch, tmp_path):
     with pytest.raises(AttributeError, match="_dragonfruit"):
         props_mod.Props().generate(1, 1, 32, {"kind": "fruit",
                                               "form": "dragonfruit"})
+
+def test_critter_override_flows_into_generator(monkeypatch, tmp_path):
+    """A consumer's new ear option reaches both the word list and the table
+    the seed picks from."""
+    with _vocab_override(tmp_path, monkeypatch, critter={
+        "parts": {"ears": ["auto", "none", "round", "pointy", "long", "tuft"]},
+        "auto": {"quadruped": {"ears": ["round", "pointy", "tuft"]}},
+    }) as mods:
+        critter = mods["critter"]
+        assert "tuft" in critter.EARS
+        assert "tuft" in critter._AUTO["quadruped"]["ears"]
+
+
+def test_flora_new_age_stage_needs_no_renderer(monkeypatch, tmp_path):
+    """A stage is pure data — its numbers ride along with its name — so a new
+    age draws on the spot, and draws something different from the default."""
+    colossal = {"trunk_h": 1.30, "trunk_w": 1.80, "canopy_r": 1.50,
+                "branches": 1.40, "n_lobes": 1.30, "lean": 1.20,
+                "kink": 1.20, "fruit_p": 1.70}
+    with _vocab_override(tmp_path, monkeypatch, flora={
+        "ages": ["auto", "sapling", "young", "mature", "old", "colossal"],
+        "age_mods": {"colossal": colossal},
+    }) as mods:
+        flora = mods["flora"]
+        assert "colossal" in flora.AGES
+        assert flora._AGE_MODS["colossal"] == colossal
+
+        def px(params):
+            return bytes(flora.Flora().generate(7, 1, 64, params)[0].image.tobytes())
+
+        assert px({"kind": "tree", "age": "colossal"}) != px({"kind": "tree"})
+
+
+def test_critter_unknown_option_draws_nothing_silently(monkeypatch, tmp_path):
+    """Known gap, pinned so it stays visible.
+
+    A vocabulary declares what a spec may *say*; it does not extend what the
+    toolkit can *draw*. ``critter`` dispatches its parts through if/elif with
+    no terminal else, so an option with no renderer branch is accepted and
+    then paints nothing: ``tuft`` comes out pixel-identical to ``none``, with
+    no error anywhere. ``props`` fails loudly here (AttributeError) because it
+    dispatches through getattr. Documented in
+    docs/generators.md#data-driven-vocabularies.
+    """
+    with _vocab_override(tmp_path, monkeypatch, critter={
+        "parts": {"ears": ["auto", "none", "round", "pointy", "long", "tuft"]},
+    }) as mods:
+        critter = mods["critter"]
+
+        def px(params):
+            return bytes(critter.Critter().generate(7, 1, 64, params)[0].image.tobytes())
+
+        base = {"archetype": "quadruped"}
+        assert px({**base, "ears": "tuft"}) == px({**base, "ears": "none"})
+        assert px({**base, "ears": "tuft"}) != px({**base, "ears": "round"})

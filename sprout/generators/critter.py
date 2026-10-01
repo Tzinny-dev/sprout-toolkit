@@ -29,39 +29,33 @@ import math
 from PIL import Image, ImageDraw
 
 from .. import palettes
+from .. import vocab as vocab_mod
 from .base import FrameData, Generator
 from .props import _anchor_from_alpha, _rnd
 
 TAU = math.tau
 
-ARCHETYPES = ("quadruped", "bird", "fish", "reptile", "bug")
-EARS = ("auto", "none", "round", "pointy", "long")
-SNOUT = ("auto", "none", "short", "long", "beak")
-TAIL = ("auto", "none", "short", "long", "bushy", "fan")
-LEGS = ("auto", "none", "stubby", "thin", "splayed")
-WINGS = ("auto", "none", "small", "spread")
-PATTERNS = ("auto", "none", "spots", "stripes", "patch")
-FACINGS = ("right", "left")
+# Loaded from assets/vocab/critter.json so consumers can extend the anatomy
+# vocabulary without forking the toolkit (see sprout/vocab.py). ``auto`` moves
+# into the file with the rest: an option only means something if some archetype
+# can pick it, so the word list and the per-archetype table are overridden
+# together or not at all.
+_vocab = vocab_mod.load("critter")
 
-# Seed picks per archetype when the part param is "auto".
+ARCHETYPES = tuple(_vocab["archetypes"])
+FACINGS = tuple(_vocab["facings"])
+EARS = tuple(_vocab["parts"]["ears"])
+SNOUT = tuple(_vocab["parts"]["snout"])
+TAIL = tuple(_vocab["parts"]["tail"])
+LEGS = tuple(_vocab["parts"]["legs"])
+WINGS = tuple(_vocab["parts"]["wings"])
+PATTERNS = tuple(_vocab["parts"]["pattern"])
+
+# Seed picks per archetype when the part param is "auto". ``bug`` gets only
+# "none" there: it already draws its own mirrored elytra spots.
 _AUTO: dict[str, dict[str, tuple[str, ...]]] = {
-    "quadruped": {"ears": ("round", "pointy"), "snout": ("short", "long"),
-                  "tail": ("short", "bushy"), "legs": ("stubby",),
-                  "wings": ("none",),
-                  "pattern": ("none", "spots", "stripes", "patch")},
-    "bird": {"ears": ("none",), "snout": ("beak",), "tail": ("fan",),
-             "legs": ("thin",), "wings": ("small", "spread"),
-             "pattern": ("none", "stripes")},
-    "fish": {"ears": ("none",), "snout": ("none",), "tail": ("fan",),
-             "legs": ("none",), "wings": ("none",),
-             "pattern": ("none", "spots", "stripes")},
-    "reptile": {"ears": ("none",), "snout": ("short",), "tail": ("long", "short"),
-                "legs": ("splayed",), "wings": ("none",),
-                "pattern": ("none", "stripes", "patch")},
-    "bug": {"ears": ("none",), "snout": ("none",), "tail": ("none",),
-            "legs": ("thin",), "wings": ("none", "small"),
-            # the bug already draws its own mirrored elytra spots
-            "pattern": ("none",)},
+    archetype: {part: tuple(opts) for part, opts in parts.items()}
+    for archetype, parts in _vocab["auto"].items()
 }
 
 _PART_SALTS = {"ears": 11, "snout": 12, "tail": 13, "legs": 14, "wings": 15,

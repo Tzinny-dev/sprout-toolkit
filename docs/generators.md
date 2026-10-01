@@ -33,6 +33,38 @@ invalid: item 'frutilla': unknown param(s) for 'props': 'forma'
          (known: accent, autotile, fill, form, kind, outline, palette)
 ```
 
+## Data-driven vocabularies
+
+Four generators read their word lists from JSON under
+`sprout/assets/vocab/` instead of hardcoding them, so a consumer can extend
+the toolkit's vocabulary without forking it:
+
+| file | holds |
+|---|---|
+| `props.json` | `forms` per kind, and the `colors` per form |
+| `face.json` | heads, eyes, gazes, mouths, brows, extras, and `moods` |
+| `critter.json` | archetypes, per-part options, facings, and the `auto` pick table |
+| `flora.json` | canopy, trunk, plant forms, `ages`, and the `age_mods` numbers |
+
+Point `SPROUT_VOCAB_DIR` at a directory holding same-named JSON files and
+they are deep-merged over the packaged defaults, consumer values winning.
+Lists are replaced wholesale (a form list is a complete set, not something
+to merge element-wise); dicts merge key by key, so adding one mood or one
+age stage does not mean restating the others. Colors normalize from JSON
+`[r, g, b]` to the tuples PIL needs.
+
+```console
+$ SPROUT_VOCAB_DIR=./my-vocab sprout validate specs/flora.json
+$ # a "colossal" age, declared only in ./my-vocab/flora.json:
+$ SPROUT_VOCAB_DIR=./my-vocab sprout generate specs/my-trees.json -o out/
+```
+
+A vocabulary extends what a spec is *allowed* to say; it does not extend
+what the toolkit can *draw*. Declaring a new option the renderer has no
+branch for is accepted and then paints nothing — validation passes, the
+frame comes out with that part missing. Pair a new vocabulary entry with
+the code that draws it.
+
 ## Writing a generator
 
 A generator is a `Generator` subclass: an `id`, the `PARAMS` surface it
@@ -169,6 +201,10 @@ Not every part applies to every archetype (`bug` ignores `snout`/`tail`,
 `fish` ignores `legs`/`ears`) — the value is validated against the part's
 own vocabulary, not per archetype. Example spec: `specs/critter.json`.
 
+Those word lists — archetypes, per-part options, facings and the
+per-archetype `auto` table — load from `assets/vocab/critter.json`. See
+[Data-driven vocabularies](#data-driven-vocabularies).
+
 ## `flora`
 
 Trees and forest-floor plants. Anatomy (canopy shape, trunk style, plant
@@ -192,6 +228,11 @@ arcs. Showcase: `docs/showcase/flora.png`, `docs/showcase/flora_sway.gif`.
 
 `auto` lets the seed pick. Default palettes are colored (green foliage),
 so `tint: shade` re-hues them via luminance like any other generator.
+
+Canopies, trunk styles, plant forms and the age stages load from
+`assets/vocab/flora.json`, with each stage's scaling numbers in `age_mods`
+right beside its name, so a new stage arrives with its proportions attached.
+See [Data-driven vocabularies](#data-driven-vocabularies).
 
 ## `face`
 
