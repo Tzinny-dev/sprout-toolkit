@@ -387,3 +387,70 @@ def test_manifest_frames_and_shape(tmp_path: Path) -> None:
         assert "anchor" in f
     assert m["anim"]["blink"]["fps"] == 6
     assert m["anim"]["blink"]["frames"] == [f"blink_0{i}" for i in range(4)]
+
+
+# ── `mouth` is both a shape and a colour role ──────────────────────────
+#
+# `mouth` names a shape in MOUTHS *and* a colour role in DEFAULTS, and it is
+# the only param where those two collide. The value type disambiguates: a
+# string picks the shape, a [r, g, b] list recolours and leaves the shape on
+# the mood. Before this was settled the shape reading won, so the colour was
+# rejected outright — a documented colour role no spec could reach.
+
+def _px(params: dict, frame_px: int = 64) -> bytes:
+    return Face().generate(7, 1, frame_px, dict(params))[0].image.tobytes()
+
+
+def test_mouth_color_is_accepted():
+    """The regression: a [r,g,b] in `mouth` used to raise ValueError."""
+    assert Face().generate(7, 1, 64, {"mouth": [200, 60, 60]})
+
+
+def test_mouth_string_still_picks_the_shape():
+    assert _px({"mouth": "frown"}) != _px({"mouth": "grin"})
+
+
+def test_mouth_color_leaves_the_shape_on_the_mood():
+    """With no explicit shape, the mood's mouth shape is what gets drawn."""
+    with_mood = _px({"mood": "happy", "mouth": [200, 60, 60]})
+    assert with_mood != _px({"mood": "sad", "mouth": [200, 60, 60]})
+
+
+@pytest.mark.parametrize("mood", sorted(MOODS))
+def test_mouth_color_recolors_every_shape(mood: str):
+    """Every shape honours the colour, including the line-shaped ones.
+
+    flat/smile/frown/wavy/cat are inked in the eye colour so a face reads as
+    one drawing; only open and grin ever read the `mouth` role. Accepting the
+    colour without honouring it there would mean a spec that validates and
+    then draws no change at all — the plausible-but-wrong outcome.
+    """
+    assert _px({"mood": mood, "mouth": [200, 60, 60]}) != _px({"mood": mood})
+
+
+def test_mouth_color_actually_paints_the_pixels():
+    """Not just "different": the requested RGB is really on the face."""
+    frames = Face().generate(7, 1, 64, {"mood": "joy", "mouth": [12, 200, 90]})
+    assert _count(frames[0].image, (12, 200, 90)) > 0
+
+
+def test_unset_mouth_keeps_the_eye_ink():
+    """Line mouths stay in the eye colour when no mouth colour is authored."""
+    for mood in ("happy", "sad", "neutral", "cry"):
+        eye = Face.DEFAULTS["eye"]
+        frames = Face().generate(7, 1, 64, {"mood": mood})
+        assert _count(frames[0].image, eye) > 0
+        assert _count(frames[0].image, Face.DEFAULTS["mouth"]) == 0
+
+
+@pytest.mark.parametrize("bad", ["grill", 7, [200, 60], [200, 60, 60, 1]])
+def test_bad_mouth_still_raises(bad):
+    """Disambiguation must not become a hole: junk is still rejected."""
+    with pytest.raises(ValueError, match="mouth"):
+        Face().generate(7, 1, 64, {"mouth": bad})
+
+
+def test_mouth_color_keeps_an_explicit_shape():
+    """Both halves at once: the author pins the shape *and* the colour, and the
+    colour does not swallow the shape."""
+    assert _px({"mood": "joy", "mouth": [12, 200, 90]}) != _px({"mood": "sad"})

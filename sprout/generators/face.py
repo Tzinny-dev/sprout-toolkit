@@ -17,6 +17,15 @@ other frames are byte-identical (an emotion icon must not wobble).
 Outline follows the shared rule (``palettes.outline_width``); colors are
 plain roles (``fill``/``outline``/``eye``/``accent``/``drop``/``mouth``)
 and accept ``params.palette``.
+
+``mouth`` carries both meanings and the value type tells them apart: a
+string picks the shape (``flat``/``smile``/``grin``/``open``/``frown``/
+``wavy``/``cat``), a ``[r, g, b]`` list recolours it while the shape keeps
+following the mood. So ``mood=happy + mouth=[200,60,60]`` is happy's smile
+in that red, and ``mouth="frown"`` is a frown in the default colour. It is
+the only param that is both a shape and a colour role; before this was
+settled the shape reading won and the colour was rejected outright, so a
+documented colour role could not be reached from a spec at all.
 """
 from __future__ import annotations
 
@@ -81,6 +90,17 @@ def _anatomy(vs: int) -> dict:
         "eye_scale": 0.92 + _rnd(vs, 31) * 0.16,
         "mouth_scale": 0.92 + _rnd(vs, 32) * 0.16,
     }
+
+
+def _is_color(value: object) -> bool:
+    """``[r, g, b]`` marks a colour override.
+
+    The shared convention across the toolkit, and what
+    ``palettes.resolve_params`` injects. Both readers of a colour param — the
+    shape/name disambiguation above and the role merge below — go through this
+    one predicate so they cannot drift into disagreeing about what a value is.
+    """
+    return isinstance(value, list) and len(value) == 3
 
 
 class Face(Generator):
@@ -238,15 +258,15 @@ class Face(Generator):
         w = max(2, ow)
         if style == "flat":
             hw = 0.07 * S * ms
-            d.line([cx - hw, my, cx + hw, my], fill=p["eye"], width=w)
+            d.line([cx - hw, my, cx + hw, my], fill=p["mouth_ink"], width=w)
         elif style == "smile":
             rx, ry = 0.11 * S * ms, 0.07 * S * ms
             d.arc([cx - rx, my - ry, cx + rx, my + ry], 15, 165,
-                  fill=p["eye"], width=w)
+                  fill=p["mouth_ink"], width=w)
         elif style == "frown":
             rx, ry = 0.11 * S * ms, 0.07 * S * ms
             d.arc([cx - rx, my - ry, cx + rx, my + ry], 195, 345,
-                  fill=p["eye"], width=w)
+                  fill=p["mouth_ink"], width=w)
         elif style == "open":
             rx, ry = 0.075 * S * ms, 0.09 * S * ms
             d.ellipse([cx - rx, my - ry, cx + rx, my + ry],
@@ -267,13 +287,13 @@ class Face(Generator):
                 x = cx + (t - 0.5) * 0.20 * S * ms
                 y = my + 0.028 * S * math.sin(t * 3 * math.pi)
                 pts.append((x, y))
-            d.line(pts, fill=p["eye"], width=w, joint="curve")
+            d.line(pts, fill=p["mouth_ink"], width=w, joint="curve")
         elif style == "cat":  # omega: two small arcs side by side
             rx, ry = 0.055 * S * ms, 0.045 * S * ms
             for side in (-1, 1):
                 bx = cx + side * rx
                 d.arc([bx - rx, my - ry, bx + rx, my + ry], 15, 165,
-                      fill=p["eye"], width=w)
+                      fill=p["mouth_ink"], width=w)
 
     # ── Extras ────────────────────────────────────────────────────────
     def _extras(self, d: ImageDraw.ImageDraw, S: float, cx: float, cy: float,
@@ -327,7 +347,18 @@ class Face(Generator):
         for name, vocab in (("head", HEADS), ("eyes", EYES), ("gaze", GAZES),
                              ("mouth", MOUTHS), ("brows", BROWS),
                              ("extras", EXTRAS)):
-            val = str(params.get(name, "auto"))
+            raw = params.get(name, "auto")
+            # `mouth` is overloaded: it names a shape in MOUTHS *and* a colour
+            # role (DEFAULTS["mouth"], painted as p["mouth"]). A [r,g,b] list
+            # is unambiguously the colour, so it leaves the shape on "auto" to
+            # fall back to the mood and is consumed by the colour roles below.
+            # It is the only such collision: the other shape params never name
+            # a colour. Palettes would hit the same wall — resolve_params
+            # injects lists.
+            if name == "mouth" and _is_color(raw):
+                resolved[name] = "auto"
+                continue
+            val = str(raw)
             if val not in vocab:
                 raise ValueError(
                     f"invalid face.{name} '{val}' "
@@ -350,8 +381,16 @@ class Face(Generator):
         gaze = "center" if resolved["gaze"] == "auto" else resolved["gaze"]
 
         p = dict(self.DEFAULTS)
-        p.update({k: tuple(v) for k, v in params.items()
-                  if isinstance(v, list) and len(v) == 3})
+        p.update({k: tuple(v) for k, v in params.items() if _is_color(v)})
+        # The line-shaped mouths (flat/smile/frown/wavy/cat) have always been
+        # inked in the eye colour so a face reads as one drawing, while open
+        # and grin take the `mouth` role. An explicit `mouth: [r, g, b]` means
+        # the author wants that colour *on the mouth*, so it has to win here
+        # too — otherwise recolouring the mouth would pass validation and then
+        # do nothing on 5 of the 7 shapes. Left unset, the historical eye-ink
+        # stands, byte for byte.
+        p["mouth_ink"] = (p["mouth"] if _is_color(params.get("mouth"))
+                          else p["eye"])
         ow = palettes.outline_width(frame_px)
 
         blinkable = eyes in BLINKABLE

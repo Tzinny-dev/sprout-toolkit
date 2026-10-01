@@ -28,6 +28,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   per-age `age_mods` numbers, so extending a vocabulary cannot leave a value
   the renderer has no branch for. Purely a data move — all 13 bundled specs
   generate byte-identical atlases. Tests: `test_vocab.py` (23).
+- **`face.params.mouth` resolved**: `mouth` named a shape in `MOUTHS` *and* a
+  colour role in `DEFAULTS`, the only param where those collide, and the shape
+  reading won — so `{"mouth": [200, 60, 60]}` was rejected with `invalid
+  face.mouth`, and a colour role the docs listed was unreachable from any spec.
+  The value type now settles it: a string picks the shape, a `[r, g, b]` list
+  recolours the mouth and leaves the shape on the mood. It also honours the
+  colour on the five line-shaped mouths (`flat`/`smile`/`frown`/`wavy`/`cat`),
+  which have always been inked in the `eye` colour so a face reads as one
+  drawing — accepting the colour without applying it there would mean a spec
+  that validates and then draws no change at all. Default output unchanged:
+  `face.json` still generates a byte-identical atlas, as do all 13 specs. Junk
+  in `mouth` (`"grill"`, `7`, a 2- or 4-int list) is still rejected, so the
+  disambiguation is not a hole in validation. Tests: `test_face.py`
+  (123 → 149).
 - **Unknown-param validation**: every built-in generator declares the
   `item.params` keys it reads (`Generator.PARAMS`), and the spec loader
   rejects anything else. A typo in a hand-written `mapping.json` — the

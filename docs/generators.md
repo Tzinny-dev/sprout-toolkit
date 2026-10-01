@@ -250,7 +250,7 @@ test. Showcase: `docs/showcase/face.png`.
 | `mood` | `auto` | `auto` \| `neutral` \| `happy` \| `joy` \| `laugh` \| `sad` \| `cry` \| `angry` \| `scared` \| `surprised` \| `sleepy` \| `wink` \| `love` \| `confused` \| `worried` \| `determined` \| `dizzy` |
 | `head` | `auto` | `auto` \| `round` \| `oval` \| `square` \| `wide` |
 | `eyes` | `auto` | `auto` \| `open` \| `wide` \| `happy` \| `closed` \| `wink` \| `heart` \| `x` |
-| `mouth` | `auto` | `auto` \| `flat` \| `smile` \| `grin` \| `open` \| `frown` \| `wavy` \| `cat` |
+| `mouth` | `auto` | as a **string**: `auto` \| `flat` \| `smile` \| `grin` \| `open` \| `frown` \| `wavy` \| `cat` |
 | `brows` | `auto` | `auto` \| `none` \| `flat` \| `angry` \| `sad` \| `raised` |
 | `extras` | `auto` | `auto` \| `none` \| `blush` \| `sweat` \| `tears` \| `anger` |
 | `fill` | `[245, 227, 201]` | `[r, g, b]` head tone |
@@ -259,13 +259,28 @@ test. Showcase: `docs/showcase/face.png`.
 | `eye_white` | `[255, 255, 255]` | `[r, g, b]` sclera |
 | `accent` | `[244, 138, 150]` | `[r, g, b]` blush / heart eyes |
 | `drop` | `[120, 190, 245]` | `[r, g, b]` sweat / tears |
-| `mouth` | `[92, 54, 50]` | `[r, g, b]` mouth interior |
+| `mouth` | `[92, 54, 50]` | as a **`[r, g, b]` list**: mouth colour, shape still from the mood |
 | `tongue` | `[240, 128, 128]` | `[r, g, b]` tongue |
 | `anger` | `[222, 70, 58]` | `[r, g, b]` anger mark |
 
 A part param (`eyes`, `mouth`, …) overrides the mood's choice for that
 part only; `mood: auto` resolves to one of the 16 presets from the seed.
 Example specs: `specs/flora.json`, `specs/face.json`.
+
+**`mouth` is both a shape and a colour role**, the only param where those two
+collide — which is why it appears twice above. The value type settles it:
+
+```json
+{ "params": { "mouth": "frown" } }              // frown shape, default colour
+{ "params": { "mouth": [200, 60, 60] } }        // mood's shape, that red
+{ "params": { "mood": "sad", "mouth": [200, 60, 60] } }  // frown, that red
+```
+
+Unset, the line-shaped mouths (`flat`/`smile`/`frown`/`wavy`/`cat`) are inked
+in the `eye` colour so a face reads as one drawing, and only `open`/`grin` use
+the `mouth` colour. Naming a `mouth` colour recolours all seven. Anything else
+in `mouth` — `"grill"`, `7`, `[200, 60]`, `[200, 60, 60, 1]` — is still
+rejected, so the disambiguation is not a hole in validation.
 
 ## `particles`
 
