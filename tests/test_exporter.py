@@ -116,7 +116,9 @@ def test_build_sheet_includes_anchor_when_present() -> None:
     spec = load_spec(SPECS / "props.json")
     img = Image.new("RGBA", (spec.layout.frame_px, spec.layout.frame_px), (0, 0, 0, 0))
     frames_with_anchor = [FrameData(id="rock_00", image=img, meta={"anchor": {"x": 10, "y": 20}})]
-    _, records = build_sheet(spec, [frames_with_anchor])
+    # N=1 explicitly: the frame above is frame_px wide, and the shipped specs
+    # now ask for 4, which would both rescale the anchor and expect a wider frame.
+    _, records = build_sheet(spec, [frames_with_anchor], 1)
     assert records[0]["anchor"] == {"x": 10, "y": 20}
 
 
@@ -124,7 +126,7 @@ def test_build_sheet_omits_anchor_when_absent() -> None:
     spec = load_spec(SPECS / "props.json")
     img = Image.new("RGBA", (spec.layout.frame_px, spec.layout.frame_px), (0, 0, 0, 0))
     frames_without_anchor = [FrameData(id="spark_00", image=img)]
-    _, records = build_sheet(spec, [frames_without_anchor])
+    _, records = build_sheet(spec, [frames_without_anchor], 1)
     assert "anchor" not in records[0]
 
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from PIL import Image
 from typer.testing import CliRunner
 
@@ -23,13 +24,29 @@ SPECS = Path(__file__).resolve().parents[1] / "specs"
 runner = CliRunner()
 
 
-def _gen(spec: str, tmp_path: Path, *extra: str) -> tuple[Image.Image, dict]:
-    out = tmp_path / f"{spec}-{' '.join(extra) or 'n1'}".replace("/", "_")
-    result = runner.invoke(app, ["generate", str(SPECS / f"{spec}.json"),
-                                 "-o", str(out), *extra])
+def _spec_copy(tmp_path: Path, name: str, supersample: int) -> Path:
+    """A copy of a bundled spec with `layout.supersample` forced.
+
+    The shipped specs ask for 4, so a test about N=1 has to say so rather than
+    rely on the default staying where it was.
+    """
+    raw = json.loads((SPECS / f"{name}.json").read_text())
+    raw["layout"]["supersample"] = supersample
+    out = tmp_path / f"{name}-{supersample}.json"
+    out.write_text(json.dumps(raw, indent=2) + "\n")
+    return out
+
+
+def _gen_path(spec: Path, tmp_path: Path, *extra: str) -> tuple[Image.Image, dict]:
+    out = tmp_path / (spec.stem + "-" + ("-".join(extra) or "default"))
+    result = runner.invoke(app, ["generate", str(spec), "-o", str(out), *extra])
     assert result.exit_code == 0, result.output
     return (Image.open(out / "atlas.png").convert("RGBA"),
             json.loads((out / "manifest.json").read_text()))
+
+
+def _gen(spec: str, tmp_path: Path, *extra: str) -> tuple[Image.Image, dict]:
+    return _gen_path(SPECS / f"{spec}.json", tmp_path, *extra)
 
 
 def _partial_alpha(img: Image.Image) -> int:
@@ -40,11 +57,17 @@ def _partial_alpha(img: Image.Image) -> int:
 
 # ── the atlas is unchanged in logical terms ───────────────────────────────────
 
-def test_supersample_one_matches_the_default_exactly(tmp_path: Path) -> None:
-    """N=1 must not touch a byte: the flag defaults to 1 and divides nothing."""
-    a, _ = _gen("critter", tmp_path)
-    b, _ = _gen("critter", tmp_path, "--supersample", "1")
+def test_supersample_one_is_the_pre_flag_bytes(tmp_path: Path) -> None:
+    """N=1 must not touch a byte: it divides nothing and filters nothing.
+
+    Pinned against a spec that *asks* for 1, so this keeps meaning the same
+    thing after the shipped specs moved to 4.
+    """
+    spec = _spec_copy(tmp_path, "critter", 1)
+    a, _ = _gen_path(spec, tmp_path)
+    b, _ = _gen_path(spec, tmp_path, "--supersample", "1")
     assert a.tobytes() == b.tobytes()
+    assert sum(a.getchannel("A").histogram()[1:255]) == 0
 
 
 def test_supersample_one_keeps_anchor_ints(tmp_path: Path) -> None:
@@ -54,7 +77,7 @@ def test_supersample_one_keeps_anchor_ints(tmp_path: Path) -> None:
     bbox's exclusive edge. Dividing by an explicit 1 would float it and
     rewrite the manifest of an atlas whose pixels never moved.
     """
-    _, m1 = _gen("critter", tmp_path)
+    _, m1 = _gen("critter", tmp_path, "--supersample", "1")
     anchor = m1["frames"][0]["anchor"]
     assert isinstance(anchor["y"], int), "int anchor became a float at N=1"
 
@@ -107,7 +130,7 @@ def test_supersample_divides_font_advances(tmp_path: Path) -> None:
 
 def test_supersample_antialiases_edges(tmp_path: Path) -> None:
     """N=1 cannot produce a partial alpha; N=4 must produce plenty."""
-    img1, _ = _gen("critter", tmp_path)
+    img1, _ = _gen("critter", tmp_path, "--supersample", "1")
     img4, _ = _gen("critter", tmp_path, "--supersample", "4")
     assert _partial_alpha(img1) == 0, "N=1 produced antialiasing it cannot have"
     assert _partial_alpha(img4) > 1000
@@ -138,12 +161,20 @@ def test_supersample_is_deterministic(tmp_path: Path) -> None:
 
 # ── library-level contract ────────────────────────────────────────────────────
 
-def test_library_api_defaults_to_one() -> None:
+def test_library_api_follows_the_spec_not_a_hardcoded_one() -> None:
+    """No-argument calls must honour layout.supersample, not default to 1.
+
+    A library caller gets the atlas the CLI would produce from that spec; only
+    an explicit argument overrides it.
+    """
     spec = load_spec(SPECS / "critter.json")
-    plain, records = build_sheet(spec, render_items(spec))
-    ss1, records1 = build_sheet(spec, render_items(spec, 1), 1)
-    assert plain.tobytes() == ss1.tobytes()
+    assert spec.layout.supersample == 4, "shipped specs are expected to smooth"
+    implicit, records = build_sheet(spec, render_items(spec))
+    explicit, records1 = build_sheet(spec, render_items(spec, 4), 4)
+    assert implicit.tobytes() == explicit.tobytes()
     assert records == records1
+    aliased, _ = build_sheet(spec, render_items(spec, 1), 1)
+    assert aliased.tobytes() != implicit.tobytes()
 
 
 def test_sheet_reduces_to_an_integer_multiple() -> None:
@@ -154,6 +185,71 @@ def test_sheet_reduces_to_an_integer_multiple() -> None:
         cols, rows = spec.layout.cols, spec.layout.resolve_rows(spec.total_frames)
         assert img.size == (cols * spec.layout.frame_px, rows * spec.layout.frame_px), n
         assert len(records) == spec.total_frames
+
+
+# ── layout.supersample: the decision lives in the spec ────────────────────────
+
+def test_spec_field_carries_the_decision(tmp_path: Path) -> None:
+    """No flag, no surprise: the atlas follows layout.supersample."""
+    spec = load_spec(SPECS / "critter.json")
+    assert spec.layout.supersample == 4
+    from_flag, _ = _gen("critter", tmp_path, "--supersample", "4")
+    from_spec, _ = _gen("critter", tmp_path)
+    assert from_flag.tobytes() == from_spec.tobytes()
+
+
+def test_spec_field_defaults_to_one(tmp_path: Path) -> None:
+    """Omitting the field must stay byte-identical to the pre-feature output."""
+    raw = json.loads((SPECS / "critter.json").read_text())
+    del raw["layout"]["supersample"]
+    path = tmp_path / "no-supersample.json"
+    path.write_text(json.dumps(raw, indent=2) + "\n")
+    img, _ = _gen_path(path, tmp_path)
+    assert _partial_alpha(img) == 0
+
+
+def test_flag_overrides_the_spec_both_ways(tmp_path: Path) -> None:
+    """--supersample 1 can un-smooth a spec that asks for 4, and vice versa."""
+    smoothed, _ = _gen("critter", tmp_path)
+    forced_off, _ = _gen("critter", tmp_path, "--supersample", "1")
+    assert _partial_alpha(smoothed) > 1000
+    assert _partial_alpha(forced_off) == 0
+    spec_off = _spec_copy(tmp_path, "critter", 1)
+    forced_on, _ = _gen_path(spec_off, tmp_path, "--supersample", "4")
+    assert _partial_alpha(forced_on) > 1000
+
+
+@pytest.mark.parametrize("bad", [0, 9, -1])
+def test_spec_field_is_validated(tmp_path: Path, bad: int) -> None:
+    raw = json.loads((SPECS / "critter.json").read_text())
+    raw["layout"]["supersample"] = bad
+    path = tmp_path / "bad.json"
+    path.write_text(json.dumps(raw, indent=2) + "\n")
+    result = runner.invoke(app, ["generate", str(path), "-o", str(tmp_path / "o")])
+    assert result.exit_code != 0
+    assert "layout.supersample must be 1..8" in result.output
+
+
+def test_batch_exposes_supersample(tmp_path: Path) -> None:
+    """The gap that started this: batch could not supersample at all."""
+    src = tmp_path / "specs"
+    src.mkdir()
+    for n in ("critter", "face"):
+        raw = json.loads((SPECS / f"{n}.json").read_text())
+        raw["layout"]["supersample"] = 1
+        # batch -o writes every spec into one directory, so the atlas names have
+        # to differ or they overwrite each other.
+        raw["files"]["atlas"] = f"{n}.png"
+        (src / f"{n}.json").write_text(json.dumps(raw, indent=2) + "\n")
+    ok = runner.invoke(app, ["batch", str(src), "-o", str(tmp_path / "plain")])
+    assert ok.exit_code == 0, ok.output
+    assert _partial_alpha(
+        Image.open(tmp_path / "plain" / "critter.png").convert("RGBA")) == 0
+    ss = runner.invoke(app, ["batch", str(src), "-o", str(tmp_path / "ss"),
+                             "--supersample", "4"])
+    assert ss.exit_code == 0, ss.output
+    assert _partial_alpha(
+        Image.open(tmp_path / "ss" / "critter.png").convert("RGBA")) > 1000
 
 
 # ── validation ────────────────────────────────────────────────────────────────

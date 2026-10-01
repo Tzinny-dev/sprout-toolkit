@@ -3,7 +3,7 @@
   "seed": 4242,
   "target": "expo-rn-skia",
   "files": { "atlas": "atlas.png" },
-  "layout": { "framePx": 64, "cols": 8, "tileLogical": 32, "sample": "nearest" },
+  "layout": { "framePx": 64, "cols": 8, "tileLogical": 32, "sample": "nearest", "supersample": 4 },
   "items": [
     { "id": "oak",     "generator": "flora", "frames": 4, "params": { "canopy": "round", "age": "mature", "sway": true } },
     { "id": "poplar",  "generator": "flora", "frames": 1, "params": { "canopy": "columnar", "age": "mature" } },

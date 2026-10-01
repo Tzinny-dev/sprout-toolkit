@@ -214,6 +214,9 @@ sprout generate specs/props.json --texturepacker
 # Chain of atlas mip levels (@0.5x, @0.25x, @0.125x by default)
 sprout generate specs/particles.json --mipmaps
 sprout generate specs/particles.json --mipmaps --mipmap-levels 2
+
+# Antialiased curves: render at Nx framePx and box-filter back down
+sprout generate specs/critter.json --supersample 4
 ```
 
 `--png-mode` defaults to `rgba` (no change). `png8` quantizes to 256 colors
@@ -222,6 +225,16 @@ palettes); `png24` drops alpha entirely — only use it on atlases with no
 real transparency (e.g. `terrain`). `--texturepacker`/`--mipmaps` are
 opt-in and don't affect `manifest.json`/`index.ts`, except that `--mipmaps`
 adds the `mipmaps.levels` block to the manifest.
+
+`--supersample` overrides `layout.supersample`, which is where the setting
+normally lives so the smoothing travels with the spec. PIL's primitives are
+aliased, so curves stair-step, and raising `framePx` does **not** fix it:
+`sample: nearest` point-samples and throws the extra pixels away instead of
+averaging them. Supersampling renders bigger and box-filters, which is what
+creates the antialiased edges. The atlas is unchanged in logical terms
+(`framePx`, `atlasW`/`atlasH` and every record's `x`/`y`/`w`/`h` are the
+same); the cost is PNG size and render time. `1` — the default — reproduces
+output without it byte for byte. See [`docs/spec.md`](docs/spec.md#layoutsupersample).
 
 ### Available generators
 
@@ -240,7 +253,7 @@ Example spec using `props`:
 {
   "name": "props_atlas",
   "seed": 2024,
-  "layout": { "framePx": 64, "cols": 6, "tileLogical": 32, "sample": "nearest" },
+  "layout": { "framePx": 64, "cols": 6, "tileLogical": 32, "sample": "nearest", "supersample": 4 },
   "items": [
     { "id": "rock",  "generator": "props", "frames": 6, "params": { "kind": "rock" } },
     { "id": "chest", "generator": "props", "frames": 4, "params": { "kind": "chest", "fill": [160, 110, 50] } }

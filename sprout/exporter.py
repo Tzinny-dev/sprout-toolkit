@@ -17,7 +17,7 @@ from . import __version__, autotile, sksl
 from .generators.base import FrameData
 from .generators import get_generator
 from .generators.font import resolve_font_path
-from .spec import Spec
+from .spec import Spec, SpecError
 
 
 def shader_filename(spec: Spec) -> str:
@@ -52,7 +52,21 @@ def _frame_ids(item_id: str, count: int) -> list[str]:
     return [f"{item_id}_{i:02d}" for i in range(count)]
 
 
-def render_items(spec: Spec, supersample: int = 1) -> list[list[FrameData]]:
+def resolve_supersample(spec: Spec, override: int | None = None) -> int:
+    """The supersample factor to render with: an explicit override, else the
+    spec's ``layout.supersample``, else 1.
+
+    The flag is an override so the smoothing decision can live in the spec --
+    which is where the shipped specs keep it -- instead of depending on whoever
+    invokes the command remembering a number.
+    """
+    value = spec.layout.supersample if override is None else override
+    if not 1 <= value <= 8:
+        raise SpecError(f"invalid supersample: {value} (1..8)")
+    return value
+
+
+def render_items(spec: Spec, supersample: int | None = None) -> list[list[FrameData]]:
     """Generates frames for all items, in spec order.
 
     ``supersample`` renders at ``frame_px * supersample`` so ``build_sheet``
@@ -64,7 +78,11 @@ def render_items(spec: Spec, supersample: int = 1) -> list[list[FrameData]]:
     supersampling needs no per-generator support. Metadata measured in frame
     pixels (anchors, font advances) comes back at the larger scale and is
     divided back down by ``build_sheet`` / ``build_font_map``.
+
+    Defaults to the spec's ``layout.supersample``, so a library caller gets the
+    same atlas the CLI would produce from that spec.
     """
+    supersample = resolve_supersample(spec, supersample)
     frame_px = spec.layout.frame_px * supersample
     out: list[list[FrameData]] = []
     offset = 0
@@ -80,7 +98,7 @@ def render_items(spec: Spec, supersample: int = 1) -> list[list[FrameData]]:
 
 
 def build_sheet(spec: Spec, items_frames: list[list[FrameData]],
-                supersample: int = 1) -> tuple[Image.Image, list[dict]]:
+                supersample: int | None = None) -> tuple[Image.Image, list[dict]]:
     """Packs frames into a row-major grid -> (RGBA sheet, records with coords).
 
     With ``supersample > 1`` the frames arrive at ``frame_px * supersample``
@@ -91,6 +109,7 @@ def build_sheet(spec: Spec, items_frames: list[list[FrameData]],
     resampling, so the reduced sheet keeps its edge colour instead of averaging
     in the (0, 0, 0, 0) background.
     """
+    supersample = resolve_supersample(spec, supersample)
     cols = spec.layout.cols
     frame = spec.layout.frame_px
     big = frame * supersample
@@ -137,7 +156,7 @@ def build_autotile_map(spec: Spec, items_frames: list[list[FrameData]]) -> dict:
 
 
 def build_font_map(spec: Spec, items_frames: list[list[FrameData]],
-                   supersample: int = 1) -> dict:
+                   supersample: int | None = None) -> dict:
     """Manifest `font` block: item -> {ascent, descent, glyphs}.
 
     ``ascent``/``descent`` are measured here from ``spec.layout.frame_px``, so
@@ -146,6 +165,7 @@ def build_font_map(spec: Spec, items_frames: list[list[FrameData]],
     down -- it can land a pixel off the 1x value, which is inherent to sizing a
     glyph N times up and averaging it back down.
     """
+    supersample = resolve_supersample(spec, supersample)
     items: dict[str, dict] = {}
     for item, frames in zip(spec.items, items_frames, strict=True):
         if item.generator != "font":

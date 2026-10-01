@@ -3,7 +3,7 @@
   "seed": 8191,
   "target": "expo-rn-skia",
   "files": { "atlas": "atlas.png" },
-  "layout": { "framePx": 64, "cols": 8, "tileLogical": 32, "sample": "nearest" },
+  "layout": { "framePx": 64, "cols": 8, "tileLogical": 32, "sample": "nearest", "supersample": 4 },
   "items": [
     { "id": "neutral",    "generator": "face", "frames": 1, "params": { "mood": "neutral" } },
     { "id": "happy",      "generator": "face", "frames": 1, "params": { "mood": "happy" } },

@@ -3,7 +3,7 @@
   "seed": 2024,
   "target": "expo-rn-skia",
   "files": { "atlas": "atlas.png" },
-  "layout": { "framePx": 64, "cols": 6, "tileLogical": 32, "sample": "nearest" },
+  "layout": { "framePx": 64, "cols": 6, "tileLogical": 32, "sample": "nearest", "supersample": 4 },
   "items": [
     { "id": "rock",     "generator": "props", "frames": 6, "params": { "kind": "rock" } },
     { "id": "bush",     "generator": "props", "frames": 6, "params": { "kind": "bush" } },

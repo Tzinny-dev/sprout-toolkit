@@ -44,7 +44,9 @@ sprout generate specs/demo.json --silhouette --out ./out
 ```
 
 `--tiers` and `--frame-px` are mutually exclusive. `--silhouette` also works
-with `batch` and with `--tiers` (one `silhouette.png` per tier).
+with `batch` and with `--tiers` (one `silhouette.png` per tier). `--supersample`
+overrides `layout.supersample` and defaults to whatever the spec asks for, so
+it is normally not needed — see [`spec.md`](spec.md#layoutsupersample).
 
 #### `--supersample <1..8>`
 

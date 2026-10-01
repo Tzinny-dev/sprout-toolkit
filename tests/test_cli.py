@@ -50,7 +50,7 @@ def test_init_writes_spec_and_generates(tmp_path: Path) -> None:
     assert spec.is_file()
     for artifact in ("atlas.png", "manifest.json", "index.ts"):
         assert (out / artifact).is_file(), artifact
-    assert _crc(out / "atlas.png") == 0xC4CAF76D  # starter seed=7 determinism pin
+    assert _crc(out / "atlas.png") == 0xB37DA175  # starter seed=7 determinism pin
 
     edited = json.loads(spec.read_text())
     edited["seed"] = 999

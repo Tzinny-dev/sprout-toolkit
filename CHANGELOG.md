@@ -31,6 +31,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   16x the *transient* memory; the real cost is PNG size, 216 KB to 416 KB
   across the 13 bundled specs. The 8x cap bounds a squared factor, not a
   recommendation. Tests: `test_supersample.py` (12).
+- **`layout.supersample`**: the same setting as a spec field, so the smoothing
+  decision travels with the spec instead of depending on whoever runs the
+  command remembering a number. The 13 bundled specs and the `sprout init`
+  template now ask for 4. `--supersample` becomes an *override* of the field
+  rather than a default, so `sprout generate specs/critter.json` produces the
+  smoothed atlas and `--supersample 1` still produces the old aliased bytes --
+  verified: all 13 specs are byte-identical to their pre-flag output with
+  `--supersample 1`. `render_items`/`build_sheet`/`build_font_map` default to
+  the field too, so a library caller gets what the CLI would. Two consequences
+  worth knowing: the test suite goes 13s -> 140s, because 4x means 16x the
+  pixels to draw (transient memory, not a bigger atlas), and `sprout init`'s
+  starter atlas changes, so its determinism pin moved. Tests:
+  `test_supersample.py` (19).
 - **`sprout diversity <spec>`**: measure form coverage — which items share
   the same form. Groups items by generator, frame count, autotile and
   structural params, dropping palettes, colour literals and the `tint`

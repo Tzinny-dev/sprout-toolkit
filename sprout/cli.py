@@ -65,7 +65,7 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
               skip_existing: bool, png_mode: str = "rgba",
                texturepacker: bool = False, mipmaps: bool = False,
                mip_levels: int = 3, frame_px: int | None = None,
-               silhouette: bool = False, supersample: int = 1) -> dict:
+               silhouette: bool = False, supersample: int | None = None) -> dict:
     spec = load_spec(spec_path)
     if seed is not None:
         spec.seed = seed
@@ -73,7 +73,8 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
         if frame_px < 8 or frame_px > 4096:
             raise SpecError(f"invalid --frame-px: {frame_px} (8..4096)")
         spec.layout.frame_px = frame_px
-    if supersample < 1 or supersample > 8:
+    # The flag is an override; absent means "use the spec's layout.supersample".
+    if supersample is not None and not 1 <= supersample <= 8:
         raise SpecError(f"invalid --supersample: {supersample} (1..8)")
 
     frames = render_items(spec, supersample)
@@ -159,7 +160,7 @@ STARTER_SPEC = """{
   "seed": 7,
   "target": "expo-rn-skia",
   "files": { "atlas": "atlas.png" },
-  "layout": { "framePx": 64, "cols": 4, "tileLogical": 32, "sample": "nearest" },
+  "layout": { "framePx": 64, "cols": 4, "tileLogical": 32, "sample": "nearest", "supersample": 4 },
   "items": [
     { "id": "hero", "generator": "blob_walk", "frames": 8 },
     { "id": "coin", "generator": "props", "frames": 4, "params": { "kind": "flower" } }
@@ -221,7 +222,7 @@ def generate(
     frame_px: int = typer.Option(None, "--frame-px", help="override layout.framePx (single-resolution output)"),
     silhouette: bool = typer.Option(False, "--silhouette", help="also emit silhouette.png (black x alpha) + SILHOUETTE_SOURCE"),
     tiers: str = typer.Option(None, "--tiers", help="one atlas per px size, e.g. 64,128,256 — subdirs + combined index.ts"),
-    supersample: int = typer.Option(1, "--supersample", help="render at Nx framePx and box-filter back down, for smooth curves (1..8)"),
+    supersample: int = typer.Option(None, "--supersample", help="override layout.supersample: render at Nx framePx and box-filter back down, for smooth curves (1..8)"),
 ) -> None:
     """Generate spritesheet + manifest.json + index.ts from a spec."""
     if png_mode not in PNG_MODES:
@@ -284,6 +285,7 @@ def batch(
     mipmaps: bool = typer.Option(False, "--mipmaps", help="generate a chain of atlas mip levels (@0.5x, @0.25x, ...)"),
     mipmap_levels: int = typer.Option(3, "--mipmap-levels", help="maximum number of mip levels (with --mipmaps)"),
     silhouette: bool = typer.Option(False, "--silhouette", help="also emit silhouette.png (black x alpha) + SILHOUETTE_SOURCE"),
+    supersample: int = typer.Option(None, "--supersample", help="override every spec's layout.supersample (1..8)"),
 ) -> None:
     """Generate every spec in a directory (*.json pattern)."""
     if png_mode not in PNG_MODES:
@@ -298,7 +300,8 @@ def batch(
     for f in files:
         try:
             _generate(f, out, None, skip_existing, png_mode, texturepacker,
-                      mipmaps, mipmap_levels, silhouette=silhouette)
+                      mipmaps, mipmap_levels, silhouette=silhouette,
+                      supersample=supersample)
         except SpecError as e:
             typer.secho(f"error in {f}: {e}", fg=typer.colors.RED, err=True)
             failed += 1

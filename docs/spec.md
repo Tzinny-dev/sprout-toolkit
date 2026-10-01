@@ -34,6 +34,26 @@ fails `sprout validate` / `generate` with a descriptive error.
 | `cols` | — | **required**, `> 0` — spritesheet grid columns (rows = ceil(total / cols)) |
 | `tileLogical` | `32` | `> 0` — logical tile size on screen (`frameScale = tileLogical / framePx`) |
 | `sample` | `nearest` | `nearest` \| `linear` — sampling mode for Skia; `linear` suits displaying a frame larger than its native `framePx` (e.g. a smaller tier upscaled) |
+| `supersample` | `1` | `1..8` — render each frame at `framePx × supersample` and box-filter back down, so curves get antialiased. See below. |
+
+#### `layout.supersample`
+
+PIL's drawing primitives are aliased, so every curve stair-steps. Raising
+`framePx` does **not** fix that: the default `sample: nearest` makes the
+consumer point-sample, which discards the extra pixels rather than averaging
+them, so a 128 px source looks exactly as jagged as a 64 px one. Supersampling
+renders at `framePx × N` and reduces each `N × N` block with a box filter,
+which is what creates the intermediate edge pixels.
+
+The atlas is unchanged in logical terms — `framePx`, `atlasW`/`atlasH` and
+every record's `x`/`y`/`w`/`h` stay put, and anchors and font advances are
+divided back down. `supersample: 1` reproduces pre-supersampling output byte
+for byte, so the field is safe to add to an existing spec.
+
+`4` is the useful value; the shipped specs use it. The cost is PNG size (the
+13 bundled specs go from 216 KB to 416 KB) and render time, since 4× means 16×
+the pixels to draw — transient memory, not a bigger atlas. `sprout generate
+--supersample N` overrides the field.
 
 ## Items
 

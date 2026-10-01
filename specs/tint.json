@@ -3,7 +3,7 @@
   "seed": 4242,
   "target": "expo-rn-skia",
   "files": { "atlas": "atlas.png" },
-  "layout": { "framePx": 64, "cols": 4, "tileLogical": 32, "sample": "nearest" },
+  "layout": { "framePx": 64, "cols": 4, "tileLogical": 32, "sample": "nearest", "supersample": 4 },
   "colors": [
     { "key": "ember", "hex": "#E4572E" },
     { "key": "azure", "hex": "#3E8FD0" },

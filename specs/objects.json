@@ -9,7 +9,8 @@
     "framePx": 64,
     "cols": 9,
     "tileLogical": 32,
-    "sample": "nearest"
+    "sample": "nearest",
+    "supersample": 4
   },
   "items": [
     {

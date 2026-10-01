@@ -6,7 +6,7 @@ Example:
   "seed": 1337,
   "target": "expo-rn-skia",
   "files": { "atlas": "atlas.png" },          // optional; default "<name>_atlas.png"
-  "layout": { "framePx": 64, "cols": 4, "tileLogical": 32, "sample": "nearest" },
+  "layout": { "framePx": 64, "cols": 4, "tileLogical": 32, "sample": "nearest", "supersample": 4 },
   "colors": [ { "key": "ember", "hex": "#E4572E" } ],   // optional tint palette
   "items": [
     { "id": "hero",  "generator": "blob_walk", "frames": 8, "tint": "shade" },
@@ -41,6 +41,7 @@ class Layout:
     cols: int = 0
     tile_logical: int = 32
     sample: str = "nearest"
+    supersample: int = 1
 
     def resolve_rows(self, total_frames: int) -> int:
         return -(-total_frames // self.cols)  # ceil
@@ -154,6 +155,7 @@ def load_spec(path: Path) -> Spec:
         cols=int(layout_raw.get("cols", 0)),
         tile_logical=int(layout_raw.get("tileLogical", 32)),
         sample=str(layout_raw.get("sample", "nearest")),
+        supersample=int(layout_raw.get("supersample", 1)),
     )
     if layout.frame_px <= 0:
         raise SpecError("layout.framePx must be > 0")
@@ -161,6 +163,10 @@ def load_spec(path: Path) -> Spec:
         raise SpecError("layout.tileLogical must be > 0")
     if layout.sample not in ("nearest", "linear"):
         raise SpecError(f"invalid layout.sample: {layout.sample!r} (nearest|linear)")
+    if not 1 <= layout.supersample <= 8:
+        raise SpecError(
+            f"layout.supersample must be 1..8, received {layout.supersample}"
+        )
     if layout.cols <= 0:
         raise SpecError("layout.cols must be > 0 (defines the spritesheet grid)")
 
