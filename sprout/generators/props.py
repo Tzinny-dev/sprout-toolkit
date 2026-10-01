@@ -614,6 +614,130 @@ class Props(Generator):
             d.rectangle([gx - gap, cy - 1.04 * r, gx + gap, cy - 0.62 * r],
                         fill=(0, 0, 0, 0))
 
+    # ── tool: sword ─────────────────────────────────────────────────────
+    def _sword(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+               vs: int, p: dict, ow: int) -> None:
+        # blade (tapered diamond)
+        tip, guard = cy - 0.98 * r, cy - 0.30 * r
+        bw = 0.11 * r
+        d.polygon([(cx, tip), (cx + bw, guard), (cx, guard + 0.14 * r),
+                   (cx - bw, guard)], fill=p["fill"],
+                  outline=p["outline"], width=max(1, ow // 2))
+        d.line([cx, tip + 0.08 * r, cx, guard + 0.02 * r],
+               fill=_lighten(p["fill"], 0.45), width=max(1, int(r * 0.06)))
+        # crossguard
+        _rrect(d, [cx - 0.62 * r, guard, cx + 0.62 * r, guard + 0.16 * r],
+               0.06 * r, fill=p["accent"],
+               outline=palettes.outline_color(p["accent"]), width=max(1, ow // 2))
+        # grip
+        _rrect(d, [cx - 0.07 * r, guard + 0.14 * r, cx + 0.07 * r,
+                   cy + 0.86 * r], 0.05 * r, fill=palettes.darken(p["accent"], 0.55),
+               outline=p["outline"], width=max(1, ow // 2))
+        # pommel
+        d.ellipse([cx - 0.14 * r, cy + 0.84 * r, cx + 0.14 * r, cy + 1.10 * r],
+                  fill=p["accent"], outline=p["outline"], width=max(1, ow // 2))
+
+    # ── tool: shield ────────────────────────────────────────────────────
+    def _shield(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                vs: int, p: dict, ow: int) -> None:
+        top, bot = cy - 0.90 * r, cy + 0.96 * r
+        w = 0.66 * r
+        body = [(cx - w, top + 0.10 * r), (cx + w, top + 0.10 * r),
+                (cx + w, cy + 0.20 * r), (cx, bot), (cx - w, cy + 0.20 * r)]
+        d.polygon(body, fill=p["fill"], outline=p["outline"], width=ow)
+        # vertical band
+        d.line([cx, top + 0.16 * r, cx, cy + 0.14 * r],
+               fill=p["accent"], width=max(1, int(r * 0.10)))
+        # horizontal band
+        d.line([cx - w + 0.06 * r, cy - 0.36 * r, cx + w - 0.06 * r, cy - 0.36 * r],
+               fill=p["accent"], width=max(1, int(r * 0.08)))
+        # boss (center stud)
+        d.ellipse([cx - 0.16 * r, cy - 0.52 * r, cx + 0.16 * r, cy - 0.20 * r],
+                  fill=_lighten(p["accent"], 0.30), outline=p["outline"],
+                  width=max(1, ow // 2))
+
+    # ── tool: axe ───────────────────────────────────────────────────────
+    def _axe(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+             vs: int, p: dict, ow: int) -> None:
+        # haft
+        _rrect(d, [cx - 0.06 * r, cy - 0.96 * r, cx + 0.06 * r, cy + 0.96 * r],
+               0.05 * r, fill=p["accent"],
+               outline=palettes.outline_color(p["accent"]), width=max(1, ow // 2))
+        # head: broad wedge spanning both sides of the haft (centered)
+        hl, hr_ = 0.52 * r, 0.66 * r
+        top, bot = cy - 0.84 * r, cy + 0.06 * r
+        blade = [(cx - hr_, top), (cx + hr_, top),
+                 (cx + hl, cy - 0.20 * r), (cx + hr_, bot),
+                 (cx - hr_, bot), (cx - hl, cy - 0.20 * r)]
+        d.polygon(blade, fill=p["fill"], outline=p["outline"], width=max(1, ow // 2))
+        d.line([cx - 0.34 * r, top + 0.06 * r, cx - 0.46 * r, cy - 0.20 * r],
+               fill=_lighten(p["fill"], 0.40), width=max(1, int(r * 0.05)))
+        d.line([cx + 0.34 * r, top + 0.06 * r, cx + 0.46 * r, cy - 0.20 * r],
+               fill=_lighten(p["fill"], 0.40), width=max(1, int(r * 0.05)))
+
+    # ── tool: bow ───────────────────────────────────────────────────────
+    def _bow(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+             vs: int, p: dict, ow: int) -> None:
+        # curved limbs as a polyline arc (thick so it reads at 64px)
+        steps = 16
+        thick = max(2, int(0.14 * r))
+        # arc centered on frame: bulge left, tips right
+        pts = [(cx + 0.30 * r - 0.52 * r * t * t, cy + t * 0.92 * r)
+               for t in (-1 + 2 * k / steps for k in range(steps + 1))]
+        d.line(pts, fill=p["fill"], width=thick, joint="curve")
+        d.line(pts, fill=palettes.outline_color(p["fill"]),
+               width=max(1, ow // 2), joint="curve")
+        # string (taut, connecting the tips)
+        d.line([pts[0][0], pts[0][1], cx + 0.34 * r, cy, pts[-1][0], pts[-1][1]],
+               fill=_lighten(p["accent"], 0.25), width=max(1, int(r * 0.05)))
+
+    # ── tool: pickaxe ───────────────────────────────────────────────────
+    def _pickaxe(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                 vs: int, p: dict, ow: int) -> None:
+        # handle
+        _rrect(d, [cx - 0.07 * r, cy - 0.40 * r, cx + 0.07 * r, cy + 0.96 * r],
+               0.05 * r, fill=p["accent"],
+               outline=palettes.outline_color(p["accent"]), width=max(1, ow // 2))
+        # thick double-curved head
+        thick = max(2, int(0.15 * r))
+        for side in (-1, 1):
+            d.line([cx, cy - 0.60 * r,
+                    cx + side * 0.36 * r, cy - 0.88 * r,
+                    cx + side * 0.68 * r, cy - 0.66 * r],
+                   fill=p["fill"], width=thick, joint="curve")
+            d.line([cx, cy - 0.60 * r,
+                    cx + side * 0.36 * r, cy - 0.88 * r,
+                    cx + side * 0.68 * r, cy - 0.66 * r],
+                   fill=palettes.outline_color(p["fill"]),
+                   width=max(1, ow // 2), joint="curve")
+        # collar
+        _rrect(d, [cx - 0.13 * r, cy - 0.68 * r, cx + 0.13 * r, cy - 0.48 * r],
+               0.04 * r, fill=p["fill"], outline=p["outline"], width=max(1, ow // 2))
+
+    # ── tool: wrench ────────────────────────────────────────────────────
+    def _wrench(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                vs: int, p: dict, ow: int) -> None:
+        # shaft
+        _rrect(d, [cx - 0.08 * r, cy - 0.30 * r, cx + 0.08 * r, cy + 0.92 * r],
+               0.06 * r, fill=p["fill"], outline=p["outline"], width=max(1, ow // 2))
+        # open head (jaw) at top
+        jw, jh = 0.30 * r, 0.26 * r
+        top = cy - 0.94 * r
+        d.arc([cx - jw, top, cx + jw, top + 2 * jh], 150, 30,
+              fill=p["fill"], width=max(2, int(0.16 * r)))
+        d.arc([cx - jw, top, cx + jw, top + 2 * jh], 150, 30,
+              fill=p["outline"], width=max(1, ow // 2))
+        # jaw notch (cut-out opening)
+        d.rectangle([cx - jw * 0.42, top - 0.04 * r, cx + jw * 0.42, top + jh * 0.7],
+                    fill=(0, 0, 0, 0))
+        # ring head at bottom
+        rr = 0.16 * r
+        d.ellipse([cx - rr, cy + 0.86 * r, cx + rr, cy + 1.22 * r],
+                  fill=p["fill"], outline=p["outline"], width=max(1, ow // 2))
+        d.ellipse([cx - rr * 0.45, cy + 0.86 * r + rr * 0.55,
+                   cx + rr * 0.45, cy + 1.22 * r - rr * 0.55],
+                  fill=(0, 0, 0, 0))
+
     # ── v3 forms: paper ────────────────────────────────────────────────
     def _book(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
               vs: int, p: dict, ow: int) -> None:

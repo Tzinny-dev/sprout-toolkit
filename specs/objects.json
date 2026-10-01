@@ -211,6 +211,60 @@
       }
     },
     {
+      "id": "sword",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "tool",
+        "form": "sword"
+      }
+    },
+    {
+      "id": "shield",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "tool",
+        "form": "shield"
+      }
+    },
+    {
+      "id": "axe",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "tool",
+        "form": "axe"
+      }
+    },
+    {
+      "id": "bow",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "tool",
+        "form": "bow"
+      }
+    },
+    {
+      "id": "pickaxe",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "tool",
+        "form": "pickaxe"
+      }
+    },
+    {
+      "id": "wrench",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "tool",
+        "form": "wrench"
+      }
+    },
+    {
       "id": "book",
       "generator": "props",
       "frames": 1,

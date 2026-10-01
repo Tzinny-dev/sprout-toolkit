@@ -7,11 +7,11 @@
     "flower": ["auto"],
     "fruit": ["auto", "apple", "cherry", "banana", "grapes", "strawberry"],
     "sweet": ["auto", "candy", "donut", "cookie", "cupcake", "lollipop"],
-    "potion": ["auto", "bottle", "flask", "vial"],
-    "treasure": ["auto", "coin", "gem", "star", "ring"],
-    "tool": ["auto", "hammer", "key", "pencil", "spoon", "fork"],
-    "paper": ["auto", "book", "scroll", "envelope"],
-    "container": ["auto", "bag", "box"]
+    "potion": ["auto", "bottle", "flask", "vial", "bottle_short", "bottle_round", "flask_tall"],
+    "treasure": ["auto", "coin", "gem", "star", "ring", "coin_small", "coin_thick", "gem_oval", "gem_raw"],
+    "tool": ["auto", "hammer", "key", "pencil", "spoon", "fork", "sword", "shield", "axe", "bow", "pickaxe", "wrench"],
+    "paper": ["auto", "book", "scroll", "envelope", "book_closed", "book_open", "scroll_rolled", "scroll_unrolled"],
+    "container": ["auto", "bag", "box", "bag_small", "bag_pouch", "box_closed", "box_open", "crate"]
   },
   "colors": {
     "fruit": {
@@ -29,31 +29,53 @@
       "lollipop": {"fill": [250, 116, 148], "accent": [255, 238, 242]}
     },
     "potion": {
-      "bottle": {"fill": [98, 196, 130],  "accent": [212, 236, 240]},
-      "flask":  {"fill": [146, 110, 214], "accent": [212, 236, 240]},
-      "vial":   {"fill": [240, 186, 74],  "accent": [212, 236, 240]}
+      "bottle":        {"fill": [98, 196, 130],  "accent": [212, 236, 240]},
+      "flask":         {"fill": [146, 110, 214], "accent": [212, 236, 240]},
+      "vial":          {"fill": [240, 186, 74],  "accent": [212, 236, 240]},
+      "bottle_short":  {"fill": [98, 196, 130],  "accent": [212, 236, 240]},
+      "bottle_round":  {"fill": [108, 202, 140],  "accent": [212, 236, 240]},
+      "flask_tall":    {"fill": [156, 120, 224], "accent": [212, 236, 240]}
     },
     "treasure": {
-      "coin": {"fill": [242, 198, 70],  "accent": [206, 156, 44]},
-      "gem":  {"fill": [86, 192, 222],  "accent": [206, 242, 250]},
-      "star": {"fill": [255, 214, 90],  "accent": [255, 244, 206]},
-      "ring": {"fill": [238, 198, 84],  "accent": [226, 92, 122]}
+      "coin":       {"fill": [242, 198, 70],  "accent": [206, 156, 44]},
+      "gem":        {"fill": [86, 192, 222],  "accent": [206, 242, 250]},
+      "star":       {"fill": [255, 214, 90],  "accent": [255, 244, 206]},
+      "ring":       {"fill": [238, 198, 84],  "accent": [226, 92, 122]},
+      "coin_small": {"fill": [242, 198, 70],  "accent": [206, 156, 44]},
+      "coin_thick": {"fill": [250, 206, 78],  "accent": [206, 156, 44]},
+      "gem_oval":   {"fill": [96, 202, 232],  "accent": [206, 242, 250]},
+      "gem_raw":    {"fill": [76, 182, 212],  "accent": [206, 242, 250]}
     },
     "tool": {
-      "hammer": {"fill": [150, 158, 168], "accent": [142, 98, 60]},
-      "key":    {"fill": [228, 192, 92],  "accent": [186, 144, 64]},
-      "pencil": {"fill": [246, 198, 74],  "accent": [240, 132, 150]},
-      "spoon":  {"fill": [204, 210, 218], "accent": [160, 168, 178]},
-      "fork":   {"fill": [204, 210, 218], "accent": [160, 168, 178]}
+      "hammer":  {"fill": [150, 158, 168], "accent": [142, 98, 60]},
+      "key":     {"fill": [228, 192, 92],  "accent": [186, 144, 64]},
+      "pencil":  {"fill": [246, 198, 74],  "accent": [240, 132, 150]},
+      "spoon":   {"fill": [204, 210, 218], "accent": [160, 168, 178]},
+      "fork":    {"fill": [204, 210, 218], "accent": [160, 168, 178]},
+      "sword":   {"fill": [198, 206, 216], "accent": [142, 98, 60]},
+      "shield":  {"fill": [176, 158, 132], "accent": [96, 80, 56]},
+      "axe":     {"fill": [150, 158, 168], "accent": [142, 98, 60]},
+      "bow":     {"fill": [200, 170, 130], "accent": [142, 98, 60]},
+      "pickaxe": {"fill": [150, 158, 168], "accent": [142, 98, 60]},
+      "wrench":  {"fill": [150, 158, 168], "accent": [96, 96, 96]}
     },
     "paper": {
-      "book":     {"fill": [194, 84, 94],  "accent": [240, 236, 226]},
-      "scroll":   {"fill": [236, 220, 182], "accent": [198, 162, 112]},
-      "envelope": {"fill": [242, 236, 224], "accent": [214, 92, 96]}
+      "book":           {"fill": [194, 84, 94],  "accent": [240, 236, 226]},
+      "scroll":         {"fill": [236, 220, 182], "accent": [198, 162, 112]},
+      "envelope":       {"fill": [242, 236, 224], "accent": [214, 92, 96]},
+      "book_closed":    {"fill": [184, 74, 84],  "accent": [240, 236, 226]},
+      "book_open":      {"fill": [204, 94, 104], "accent": [240, 236, 226]},
+      "scroll_rolled":  {"fill": [236, 220, 182], "accent": [198, 162, 112]},
+      "scroll_unrolled":{"fill": [246, 230, 192], "accent": [198, 162, 112]}
     },
     "container": {
-      "bag": {"fill": [208, 172, 118], "accent": [150, 112, 72]},
-      "box": {"fill": [226, 98, 108],  "accent": [250, 240, 230]}
+      "bag":        {"fill": [208, 172, 118], "accent": [150, 112, 72]},
+      "box":        {"fill": [226, 98, 108],  "accent": [250, 240, 230]},
+      "bag_small":  {"fill": [208, 172, 118], "accent": [150, 112, 72]},
+      "bag_pouch":  {"fill": [198, 162, 108], "accent": [150, 112, 72]},
+      "box_closed": {"fill": [226, 98, 108],  "accent": [250, 240, 230]},
+      "box_open":   {"fill": [236, 108, 118], "accent": [250, 240, 230]},
+      "crate":      {"fill": [190, 160, 120], "accent": [120, 92, 60]}
     }
   }
 }
