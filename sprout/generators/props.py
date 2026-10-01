@@ -912,6 +912,97 @@ class Props(Generator):
                     outline=palettes.outline_color(p["accent"]),
                     width=max(1, ow // 2))
 
+    # ── tool: paper variants ──────────────────────────────────────────
+    def _book_closed(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                     vs: int, p: dict, ow: int) -> None:
+        # shut book seen from the spine edge: narrow, tall
+        cover = [cx - 0.46 * r, cy - 0.74 * r, cx + 0.46 * r, cy + 0.78 * r]
+        d.rectangle(cover, fill=p["fill"])
+        # page block on the right edge
+        d.rectangle([cx + 0.26 * r, cy - 0.66 * r, cx + 0.46 * r, cy + 0.70 * r],
+                    fill=_lighten(p["fill"], 0.55))
+        for k in range(4):
+            y = cy - 0.50 * r + k * 0.34 * r
+            d.line([cx + 0.26 * r, y, cx + 0.46 * r, y],
+                   fill=palettes.darken(p["fill"], 0.60), width=max(1, ow // 2))
+        # spine shadow
+        d.rectangle([cx - 0.46 * r, cy - 0.74 * r, cx - 0.24 * r, cy + 0.78 * r],
+                    fill=palettes.darken(p["fill"], 0.74))
+        d.line([cx - 0.24 * r, cy - 0.70 * r, cx - 0.24 * r, cy + 0.74 * r],
+               fill=p["outline"], width=max(1, ow // 2))
+        # title band
+        d.rectangle(cover, outline=p["outline"], width=ow)
+        d.rectangle([cx - 0.12 * r, cy - 0.44 * r, cx + 0.14 * r, cy - 0.06 * r],
+                    fill=p["accent"], outline=palettes.outline_color(p["accent"]),
+                    width=max(1, int(1.5)))
+
+    def _book_open(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                   vs: int, p: dict, ow: int) -> None:
+        # open book seen from above: two facing pages
+        d.polygon([(cx - 0.86 * r, cy - 0.62 * r), (cx - 0.04 * r, cy - 0.40 * r),
+                   (cx - 0.04 * r, cy + 0.72 * r), (cx - 0.86 * r, cy + 0.50 * r)],
+                  fill=_lighten(p["fill"], 0.62))
+        d.polygon([(cx + 0.86 * r, cy - 0.62 * r), (cx + 0.04 * r, cy - 0.40 * r),
+                   (cx + 0.04 * r, cy + 0.72 * r), (cx + 0.86 * r, cy + 0.50 * r)],
+                  fill=_lighten(p["fill"], 0.48))
+        # cover peeking out behind the pages
+        d.polygon([(cx - 0.92 * r, cy - 0.54 * r), (cx + 0.92 * r, cy - 0.54 * r),
+                   (cx + 0.92 * r, cy + 0.58 * r), (cx - 0.92 * r, cy + 0.58 * r)],
+                  fill=p["fill"])
+        d.polygon([(cx - 0.86 * r, cy - 0.62 * r), (cx - 0.04 * r, cy - 0.40 * r),
+                   (cx - 0.04 * r, cy + 0.72 * r), (cx - 0.86 * r, cy + 0.50 * r)],
+                  fill=_lighten(p["fill"], 0.62))
+        d.polygon([(cx + 0.86 * r, cy - 0.62 * r), (cx + 0.04 * r, cy - 0.40 * r),
+                   (cx + 0.04 * r, cy + 0.72 * r), (cx + 0.86 * r, cy + 0.50 * r)],
+                  fill=_lighten(p["fill"], 0.48))
+        # text lines
+        for side in (-1, 1):
+            for k in range(3):
+                y = cy - 0.16 * r + k * 0.26 * r
+                d.line([cx + side * 0.16 * r, y, cx + side * 0.72 * r, y],
+                       fill=palettes.darken(p["fill"], 0.55),
+                       width=max(1, int(r * 0.05)))
+        # spine gutter
+        d.line([cx - 0.04 * r, cy - 0.40 * r, cx - 0.04 * r, cy + 0.72 * r],
+               fill=p["outline"], width=max(1, ow // 2))
+
+    def _scroll_rolled(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                       vs: int, p: dict, ow: int) -> None:
+        # tightly rolled: two visible spiral ends, no sheet
+        for k, sx in enumerate((-0.62, 0.62)):
+            er = 0.34 * r
+            d.ellipse([cx + sx * r - er, cy - er, cx + sx * r + er, cy + er],
+                      fill=p["accent"],
+                      outline=palettes.outline_color(p["accent"]), width=ow)
+            d.ellipse([cx + sx * r - er * 0.5, cy - er * 0.5,
+                       cx + sx * r + er * 0.5, cy + er * 0.5],
+                      outline=palettes.darken(p["accent"], 0.7),
+                      width=max(1, ow // 2))
+        _rrect(d, [cx - 0.62 * r, cy - 0.34 * r, cx + 0.62 * r, cy + 0.34 * r],
+               0.16 * r, fill=p["fill"], outline=p["outline"], width=ow)
+        # wrap ribbon
+        d.rectangle([cx - 0.14 * r, cy - 0.36 * r, cx + 0.14 * r, cy + 0.36 * r],
+                    fill=palettes.darken(p["fill"], 0.72))
+
+    def _scroll_unrolled(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                         vs: int, p: dict, ow: int) -> None:
+        # opened out: tall sheet with curled top and bottom rollers
+        sheet = [cx - 0.60 * r, cy - 0.86 * r, cx + 0.60 * r, cy + 0.86 * r]
+        d.rectangle(sheet, fill=p["fill"])
+        for k in range(4):
+            y = cy - 0.60 * r + k * 0.40 * r
+            d.line([cx - 0.42 * r, y, cx + 0.42 * r, y],
+                   fill=palettes.darken(p["fill"], 0.68), width=max(1, int(r * 0.055)))
+        # curl shading at the bottom of the sheet
+        d.rectangle([cx - 0.60 * r, cy + 0.62 * r, cx + 0.60 * r, cy + 0.86 * r],
+                    fill=palettes.darken(p["fill"], 0.88))
+        d.rectangle(sheet, outline=p["outline"], width=max(1, ow // 2))
+        # rollers
+        for y0, y1 in ((cy - 1.02 * r, cy - 0.80 * r), (cy + 0.80 * r, cy + 1.02 * r)):
+            _rrect(d, [cx - 0.72 * r, y0, cx + 0.72 * r, y1], 0.11 * r,
+                   fill=p["accent"], outline=palettes.outline_color(p["accent"]),
+                   width=max(1, ow // 2))
+
     # ── v3 forms: container ────────────────────────────────────────────
     def _bag(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
              vs: int, p: dict, ow: int) -> None:

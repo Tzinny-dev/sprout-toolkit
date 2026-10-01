@@ -355,6 +355,42 @@
       }
     },
     {
+      "id": "book_closed",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "paper",
+        "form": "book_closed"
+      }
+    },
+    {
+      "id": "book_open",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "paper",
+        "form": "book_open"
+      }
+    },
+    {
+      "id": "scroll_rolled",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "paper",
+        "form": "scroll_rolled"
+      }
+    },
+    {
+      "id": "scroll_unrolled",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "paper",
+        "form": "scroll_unrolled"
+      }
+    },
+    {
       "id": "bag",
       "generator": "props",
       "frames": 1,
