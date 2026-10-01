@@ -9,8 +9,8 @@ import pytest
 
 from sprout.cli import _generate
 from sprout.generators import GENERATORS
-from sprout.generators.face import (BROWS, EYES, EXTRAS, HEADS, MOODS, MOUTHS,
-                                    Face, _anatomy)
+from sprout.generators.face import (BROWS, EYES, EXTRAS, GAZES, HEADS, MOODS,
+                                    MOUTHS, Face, _anatomy)
 
 SPEC = Path(__file__).resolve().parents[1] / "specs" / "face.json"
 
@@ -69,7 +69,7 @@ def test_invalid_mood_raises() -> None:
 @pytest.mark.parametrize("name, bad, vocab", [
     ("head", "long", HEADS), ("eyes", "spiral", EYES),
     ("mouth", "grill", MOUTHS), ("brows", "unibrow", BROWS),
-    ("extras", "halo", EXTRAS),
+    ("extras", "halo", EXTRAS), ("gaze", "sideways", GAZES),
 ])
 def test_invalid_part_raises(name: str, bad: str, vocab: tuple) -> None:
     with pytest.raises(ValueError, match=name):
@@ -144,6 +144,143 @@ def test_non_blinkable_eyes_never_blink(eyes: str) -> None:
 def test_no_blink_below_four_frames() -> None:
     frames = Face().generate(3, 3, 64, {"mood": "happy"})
     assert _distinct(frames) == 1
+
+
+# ── Gaze: the pupil stays inside the sclera ─────────────────────────────
+PUPIL = Face.DEFAULTS["eye"]
+
+
+def _sclera_box(img):
+    """Bounding box (x0, y0, x1, y1) of the drawn sclera, or None."""
+    px = img.load()
+    pts = [(x, y) for x in range(img.width) for y in range(img.height)
+           if px[x, y][:3] == WHITE and px[x, y][3] > 0]
+    if not pts:
+        return None
+    xs, ys = zip(*pts)
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _overshoot(img) -> float:
+    """Worst distance (px) any pupil pixel sits outside the sclera ellipse.
+
+    Derived from the drawn pixels only — the sclera box comes from the white
+    pixels and the pupil from the pupil pixels — so it does not restate the
+    formula under test.
+    """
+    box = _sclera_box(img)
+    if box is None:
+        return 0.0
+    x0, y0, x1, y1 = box
+    cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+    rx, ry = (x1 - x0) / 2, (y1 - y0) / 2
+    px = img.load()
+    worst = 0.0
+    for x in range(img.width):
+        for y in range(img.height):
+            if px[x, y][:3] != PUPIL or px[x, y][3] == 0:
+                continue
+            ux, uy = (x - cx) / rx, (y - cy) / ry
+            m2 = ux * ux + uy * uy
+            if m2 <= 1.0:
+                continue          # inside the sclera: nothing to measure
+            m = m2 ** 0.5        # ray is well-conditioned only once outside
+            edge = (cx + rx * ux / m, cy + ry * uy / m)
+            worst = max(worst, ((x - edge[0]) ** 2 + (y - edge[1]) ** 2) ** 0.5)
+    return worst
+
+
+def _one_eye(gaze: str, style: str, eye_scale: float, frame_px: int):
+    from PIL import Image, ImageDraw
+    img = Image.new("RGBA", (frame_px, frame_px), (0, 0, 0, 0))
+    Face()._eye(ImageDraw.Draw(img), frame_px / 2, frame_px / 2,
+                float(frame_px), style, eye_scale, Face.DEFAULTS,
+                max(1, frame_px // 32), gaze)
+    return img
+
+
+def test_gaze_auto_resolves_to_center() -> None:
+    auto = Face().generate(7, 1, 64, {"mood": "neutral", "gaze": "auto"})
+    center = Face().generate(7, 1, 64, {"mood": "neutral", "gaze": "center"})
+    assert auto[0].image.tobytes() == center[0].image.tobytes()
+
+
+def test_gaze_omitted_keeps_historical_pixels() -> None:
+    """Gaze is opt-in: an item that never mentions it must not move."""
+    bare = Face().generate(13, 1, 64, {"mood": "joy"})[0].image.tobytes()
+    center = Face().generate(13, 1, 64, {"mood": "joy", "gaze": "center"})
+    assert bare == center[0].image.tobytes()
+
+
+@pytest.mark.parametrize("gaze", list(GAZES[2:]))
+def test_gaze_changes_the_pupil(gaze: str) -> None:
+    base = Face().generate(13, 1, 64, {"mood": "neutral", "gaze": "center"})
+    assert base[0].image.tobytes() != _gaze_frame(gaze)
+
+
+def _gaze_frame(gaze: str) -> bytes:
+    return Face().generate(13, 1, 64,
+                           {"mood": "neutral", "gaze": gaze})[0].image.tobytes()
+
+
+def test_gaze_directions_are_distinct() -> None:
+    seen = {_gaze_frame(g) for g in GAZES[2:]}
+    assert len(seen) == len(GAZES) - 2, "gaze directions collapsed"
+
+
+def test_gaze_is_deterministic() -> None:
+    a = Face().generate(21, 4, 64, {"mood": "happy", "gaze": "left"})
+    b = Face().generate(21, 4, 64, {"mood": "happy", "gaze": "left"})
+    assert [f.image.tobytes() for f in a] == [f.image.tobytes() for f in b]
+
+
+@pytest.mark.parametrize("gaze", list(GAZES[2:]))
+@pytest.mark.parametrize("style", ("open", "wide"))
+@pytest.mark.parametrize("eye_scale", (0.92, 1.0, 1.08))
+@pytest.mark.parametrize("frame_px", (64, 128))
+def test_pupil_never_leaves_the_sclera(gaze: str, style: str,
+                                       eye_scale: float, frame_px: int) -> None:
+    """The invariant that matters: gaze must not push the pupil out of the
+    white. ``open`` at 64px has a ~7px sclera, so this is where a naive
+    bounding-box offset breaks — the pupil's corners leave the curve long
+    before they leave the box.
+
+    Only meaningful from 64px up: the outline is 2px wide, so at 32px it eats
+    most of an ``open`` sclera and there is no white left to measure against.
+    Worst measured case is 0.2px; the slack is rasterization, not room.
+    """
+    out = _overshoot(_one_eye(gaze, style, eye_scale, frame_px))
+    assert out <= 1.5, f"{gaze}/{style}/{eye_scale}@{frame_px}: {out:.2f}px"
+
+
+@pytest.mark.parametrize("frame_px", (16, 24, 32, 48, 64, 96, 128))
+def test_gaze_keeps_the_eye_drawable_at_any_size(frame_px: int) -> None:
+    """Gaze must never degenerate the eye, even where it cannot travel: at
+    small sizes the sclera is under a pixel of room and the offset rounds
+    away, but both eyes must still be present."""
+    for gaze in GAZES[2:]:
+        for style in ("open", "wide"):
+            img = _one_eye(gaze, style, 1.0, frame_px)
+            assert _sclera_box(img) is not None, f"{gaze}/{style}@{frame_px}"
+
+
+def test_gaze_leaves_the_blink_schedule_alone() -> None:
+    for gaze in GAZES[2:]:
+        plain = Face().generate(3, 8, 64, {"mood": "happy", "gaze": "center"})
+        looked = Face().generate(3, 8, 64, {"mood": "happy", "gaze": gaze})
+        closed_plain = [i for i, f in enumerate(plain) if _count(f.image, WHITE) == 0]
+        closed = [i for i, f in enumerate(looked) if _count(f.image, WHITE) == 0]
+        assert closed_plain == closed, gaze
+        assert _distinct(looked) == 2, gaze
+
+
+@pytest.mark.parametrize("eyes", ("closed", "x", "happy", "heart"))
+def test_gaze_is_ignored_without_a_pupil(eyes: str) -> None:
+    center = Face().generate(5, 1, 64, {"mood": "happy", "eyes": eyes,
+                                        "gaze": "center"})[0].image.tobytes()
+    looked = Face().generate(5, 1, 64, {"mood": "happy", "eyes": eyes,
+                                        "gaze": "left"})[0].image.tobytes()
+    assert center == looked, eyes
 
 
 # ── Parts and moods ────────────────────────────────────────────────────
@@ -241,7 +378,9 @@ def test_manifest_frames_and_shape(tmp_path: Path) -> None:
     out = tmp_path / "out"
     _generate(SPEC, out, None, False)
     m = json.loads((out / "manifest.json").read_text())
-    assert len(m["frames"]) == len(MOODS) + 4   # 16 moods + blink
+    spec = json.loads(SPEC.read_text())
+    expected = sum(it.get("frames", 1) for it in spec["items"])
+    assert len(m["frames"]) == expected   # 16 moods + 4 blink + 5 gaze
     ids = {f["id"] for f in m["frames"]}
     assert "neutral_00" in ids and "blink_03" in ids
     for f in m["frames"]:

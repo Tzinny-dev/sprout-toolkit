@@ -21,7 +21,12 @@
     { "id": "worried",    "generator": "face", "frames": 1, "params": { "mood": "worried" } },
     { "id": "determined", "generator": "face", "frames": 1, "params": { "mood": "determined" } },
     { "id": "dizzy",      "generator": "face", "frames": 1, "params": { "mood": "dizzy" } },
-    { "id": "blink",      "generator": "face", "frames": 4, "params": { "mood": "happy" } }
+    { "id": "blink",      "generator": "face", "frames": 4, "params": { "mood": "happy" } },
+    { "id": "gaze_left",   "generator": "face", "frames": 1, "params": { "mood": "neutral", "gaze": "left"  } },
+    { "id": "gaze_right",  "generator": "face", "frames": 1, "params": { "mood": "neutral", "gaze": "right" } },
+    { "id": "gaze_up",     "generator": "face", "frames": 1, "params": { "mood": "surprised", "gaze": "up"   } },
+    { "id": "gaze_down",   "generator": "face", "frames": 1, "params": { "mood": "sad",       "gaze": "down" } },
+    { "id": "gaze_wide",   "generator": "face", "frames": 1, "params": { "mood": "neutral", "eyes": "wide", "gaze": "left" } }
   ],
   "animations": {
     "blink": { "frames": "blink", "fps": 6, "loop": true }

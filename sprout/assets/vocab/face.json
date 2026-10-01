@@ -19,6 +19,7 @@
   },
   "heads": ["auto", "round", "oval", "square", "wide"],
   "eyes": ["auto", "open", "wide", "happy", "closed", "wink", "heart", "x"],
+  "gazes": ["auto", "center", "left", "right", "up", "down"],
   "mouths": ["auto", "flat", "smile", "grin", "open", "frown", "wavy", "cat"],
   "brows": ["auto", "none", "flat", "angry", "sad", "raised"],
   "extras": ["auto", "none", "blush", "sweat", "tears", "anger"]

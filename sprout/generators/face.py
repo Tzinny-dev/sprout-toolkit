@@ -37,11 +37,21 @@ _vocab = vocab_mod.load("face")
 
 HEADS = tuple(_vocab["heads"])
 EYES = tuple(_vocab["eyes"])
+GAZES = tuple(_vocab["gazes"])
 MOUTHS = tuple(_vocab["mouths"])
 BROWS = tuple(_vocab["brows"])
 EXTRAS = tuple(_vocab["extras"])
 
 BLINKABLE = ("open", "wide", "wink", "heart")
+
+# Gaze direction as a unit step; ``GAZE_SWAY`` is the fraction of the
+# containment budget below that a gaze actually spends, so the pupil slides
+# but never leaves the sclera.
+# ``auto`` resolves to "center" (the historical centered pupil), so an item
+# that does not mention gaze keeps its exact pixels.
+_GAZE = {"center": (0.0, 0.0), "left": (-1.0, 0.0), "right": (1.0, 0.0),
+         "up": (0.0, -1.0), "down": (0.0, 1.0)}
+GAZE_SWAY = 0.8
 
 # name -> coherent parts combination
 MOODS: dict[str, dict[str, str]] = _vocab["moods"]
@@ -79,7 +89,7 @@ class Face(Generator):
     id = "face"
 
     PARAMS = frozenset({
-        "mood", "head", "eyes", "mouth", "brows", "extras",
+        "mood", "head", "eyes", "gaze", "mouth", "brows", "extras",
         "fill", "outline", "eye", "eye_white", "accent",
         "drop", "tongue", "anger",
     })
@@ -117,7 +127,8 @@ class Face(Generator):
 
     # ── Eyes ──────────────────────────────────────────────────────────
     def _eye(self, d: ImageDraw.ImageDraw, x: float, y: float, S: float,
-             style: str, es: float, p: dict, ow: int) -> None:
+             style: str, es: float, p: dict, ow: int,
+             gaze: str = "center") -> None:
         if style == "closed":
             ln = 0.105 * S * es
             d.line([x - ln, y, x + ln, y], fill=p["eye"], width=max(2, ow))
@@ -154,8 +165,27 @@ class Face(Generator):
         else:
             rx, ry, pr = 0.055 * S * es, 0.068 * S * es, 0.034 * S * es
         d.ellipse([x - rx, y - ry, x + rx, y + ry], fill=p["eye_white"])
-        d.ellipse([x - pr, y - pr + ry * 0.1, x + pr, y + pr + ry * 0.1],
-                  fill=p["eye"])
+        # Gaze slides the pupil inside the sclera. The pupil is a *disk* and
+        # the sclera an *ellipse*, so the bounding box is not the room: the
+        # pupil's corners leave the curve long before they leave the box.
+        # Containment is (dcx/(rx-pr))^2 + (dcy/(ry-pr))^2 <= 1, solved for
+        # the reach along the gaze axis. The pupil rests below centre (bias),
+        # so up and down get different reach.
+        bias = ry * 0.1
+        gxv, gyv = _GAZE.get(gaze, (0.0, 0.0))
+        rxm, rym = rx - pr, ry - pr
+        ox = oy = 0.0
+        if gxv:
+            # sliding sideways leaves the vertical offset pinned at `bias`,
+            # which already eats part of the budget
+            ox = gxv * rxm * math.sqrt(max(0.0, GAZE_SWAY**2 - (bias / rym)**2))
+        if gyv:
+            # |bias + oy| must stay within GAZE_SWAY of the room
+            t = rym * GAZE_SWAY - (bias if gyv > 0 else -bias)
+            if t > 0.0:
+                oy = gyv * t
+        d.ellipse([x + ox - pr, y + bias + oy - pr,
+                   x + ox + pr, y + bias + oy + pr], fill=p["eye"])
 
     def _blink_line(self, d: ImageDraw.ImageDraw, x: float, y: float,
                     S: float, es: float, p: dict, ow: int) -> None:
@@ -163,22 +193,23 @@ class Face(Generator):
         d.line([x - ln, y, x + ln, y], fill=p["eye"], width=max(2, ow))
 
     def _eyes(self, d: ImageDraw.ImageDraw, S: float, cx: float, cy: float,
-              style: str, es: float, p: dict, ow: int, blink: bool) -> None:
+              style: str, es: float, p: dict, ow: int, blink: bool,
+              gaze: str = "center") -> None:
         lx, rx = cx - EYE_DX * S, cx + EYE_DX * S
         ey = cy + EYE_DY * S
         if style == "wink":  # viewer-left eye open, right closed
             if blink:
                 self._blink_line(d, lx, ey, S, es, p, ow)
             else:
-                self._eye(d, lx, ey, S, "open", es, p, ow)
+                self._eye(d, lx, ey, S, "open", es, p, ow, gaze)
             self._blink_line(d, rx, ey, S, es, p, ow)
             return
         if blink:
             self._blink_line(d, lx, ey, S, es, p, ow)
             self._blink_line(d, rx, ey, S, es, p, ow)
             return
-        self._eye(d, lx, ey, S, style, es, p, ow)
-        self._eye(d, rx, ey, S, style, es, p, ow)
+        self._eye(d, lx, ey, S, style, es, p, ow, gaze)
+        self._eye(d, rx, ey, S, style, es, p, ow, gaze)
 
     # ── Brows ─────────────────────────────────────────────────────────
     def _brows(self, d: ImageDraw.ImageDraw, S: float, cx: float, cy: float,
@@ -293,9 +324,9 @@ class Face(Generator):
                 f"(available: auto, {', '.join(MOODS)})"
             )
         resolved: dict[str, str] = {}
-        for name, vocab in (("head", HEADS), ("eyes", EYES),
-                            ("mouth", MOUTHS), ("brows", BROWS),
-                            ("extras", EXTRAS)):
+        for name, vocab in (("head", HEADS), ("eyes", EYES), ("gaze", GAZES),
+                             ("mouth", MOUTHS), ("brows", BROWS),
+                             ("extras", EXTRAS)):
             val = str(params.get(name, "auto"))
             if val not in vocab:
                 raise ValueError(
@@ -315,6 +346,8 @@ class Face(Generator):
         mouth = resolved["mouth"] if resolved["mouth"] != "auto" else parts["mouth"]
         brows = resolved["brows"] if resolved["brows"] != "auto" else parts["brows"]
         extras = resolved["extras"] if resolved["extras"] != "auto" else parts["extras"]
+        # gaze has no mood preset: "auto" means the historical centered pupil
+        gaze = "center" if resolved["gaze"] == "auto" else resolved["gaze"]
 
         p = dict(self.DEFAULTS)
         p.update({k: tuple(v) for k, v in params.items()
@@ -335,7 +368,7 @@ class Face(Generator):
             d = ImageDraw.Draw(img)
             self._head(d, S, anat["head"], p, ow, cx, cy)
             self._brows(d, S, cx, cy, brows, p, ow)
-            self._eyes(d, S, cx, cy, eyes, es, p, ow, blink)
+            self._eyes(d, S, cx, cy, eyes, es, p, ow, blink, gaze)
             self._mouth(d, S, cx, cy, mouth, ms, p, ow)
             self._extras(d, S, cx, cy, extras, es, p, ow)
             out.append(FrameData(id="", image=img,
