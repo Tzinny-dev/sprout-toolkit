@@ -481,6 +481,76 @@ class Props(Generator):
                       fill=_lighten(p["fill"], 0.5))
         _rrect(d, body, 0.12 * r, outline=p["outline"], width=ow)
 
+    # ── tool: potion variants ─────────────────────────────────────────
+    def _bottle_short(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                      vs: int, p: dict, ow: int) -> None:
+        # squat, wide potion: short neck, broad body
+        d.rectangle([cx - 0.17 * r, cy - 0.48 * r, cx + 0.17 * r, cy - 0.05 * r],
+                    fill=p["accent"])
+        d.rectangle([cx - 0.21 * r, cy - 0.72 * r, cx + 0.21 * r, cy - 0.44 * r],
+                    fill=(150, 108, 70), outline=(100, 72, 44),
+                    width=max(1, ow // 2))
+        body = [cx - 0.72 * r, cy - 0.10 * r, cx + 0.72 * r, cy + 0.86 * r]
+        _rrect(d, body, 0.24 * r, fill=p["accent"])
+        d.rectangle([cx - 0.60 * r, cy + 0.28 * r, cx + 0.60 * r, cy + 0.78 * r],
+                    fill=p["fill"])
+        d.line([cx - 0.56 * r, cy + 0.30 * r, cx + 0.56 * r, cy + 0.30 * r],
+               fill=palettes.darken(p["fill"], 0.85), width=max(1, ow // 2))
+        _rrect(d, body, 0.24 * r, outline=p["outline"], width=ow)
+        d.rectangle([cx - 0.17 * r, cy - 0.48 * r, cx + 0.17 * r, cy - 0.08 * r],
+                    outline=p["outline"], width=max(1, ow // 2))
+
+    def _bottle_round(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                      vs: int, p: dict, ow: int) -> None:
+        # round-bellied flask with a stubby neck
+        d.rectangle([cx - 0.15 * r, cy - 0.58 * r, cx + 0.15 * r, cy - 0.14 * r],
+                    fill=p["accent"])
+        d.rectangle([cx - 0.19 * r, cy - 0.82 * r, cx + 0.19 * r, cy - 0.54 * r],
+                    fill=(150, 108, 70), outline=(100, 72, 44),
+                    width=max(1, ow // 2))
+        # round belly
+        RB = 0.72 * r
+        by = cy + 0.24 * r
+        d.ellipse([cx - RB, by - RB, cx + RB, by + RB], fill=p["accent"],
+                  outline=p["outline"], width=ow)
+        # liquid clipped inside the belly
+        d.chord([cx - RB + ow, by - RB + ow, cx + RB - ow, by + RB - ow],
+                0, 180, fill=p["fill"])
+        d.line([cx - 0.66 * r, by, cx + 0.66 * r, by],
+               fill=palettes.darken(p["fill"], 0.85), width=max(1, ow // 2))
+        d.rectangle([cx - 0.15 * r, cy - 0.58 * r, cx + 0.15 * r, cy - 0.16 * r],
+                    outline=p["outline"], width=max(1, ow // 2))
+
+    def _flask_tall(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                    vs: int, p: dict, ow: int) -> None:
+        # long-necked conical flask (reads as "distilled")
+        hw0, hw1 = 0.15 * r, 0.62 * r
+        y_top, y_bot = cy - 0.50 * r, cy + 0.98 * r
+        d.rectangle([cx - hw0, cy - 0.94 * r, cx + hw0, y_top + 0.04 * r],
+                    fill=p["accent"])
+        d.rectangle([cx - 0.19 * r, cy - 1.04 * r, cx + 0.19 * r, cy - 0.90 * r],
+                    fill=(150, 108, 70), outline=(100, 72, 44),
+                    width=max(1, ow // 2))
+        body = [(cx - hw0, y_top), (cx - hw1, y_bot), (cx + hw1, y_bot),
+                (cx + hw0, y_top)]
+        d.polygon(body, fill=p["accent"])
+        y0 = cy + 0.30 * r
+        t = (y0 - y_top) / (y_bot - y_top)
+        hw_y = hw0 + (hw1 - hw0) * t
+        d.polygon([(cx - hw_y, y0), (cx - hw1, y_bot), (cx + hw1, y_bot),
+                   (cx + hw_y, y0)], fill=p["fill"])
+        d.line([cx - hw_y, y0, cx + hw_y, y0],
+               fill=palettes.darken(p["fill"], 0.85), width=max(1, ow // 2))
+        # rising bubbles in the long neck
+        for k, (bx, by) in enumerate(((-0.04, 0.40), (0.05, 0.60), (-0.03, 0.80))):
+            br = r * 0.055
+            d.ellipse([cx + bx * r - br, cy + by * r - br,
+                       cx + bx * r + br, cy + by * r + br],
+                      fill=_lighten(p["fill"], 0.5))
+        d.polygon(body, outline=p["outline"], width=ow)
+        d.rectangle([cx - hw0, cy - 0.94 * r, cx + hw0, y_top],
+                    outline=p["outline"], width=max(1, ow // 2))
+
     # ── v3 forms: treasure ─────────────────────────────────────────────
     def _coin(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
               vs: int, p: dict, ow: int) -> None:

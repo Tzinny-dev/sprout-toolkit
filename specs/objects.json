@@ -130,6 +130,33 @@
       }
     },
     {
+      "id": "bottle_short",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "potion",
+        "form": "bottle_short"
+      }
+    },
+    {
+      "id": "bottle_round",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "potion",
+        "form": "bottle_round"
+      }
+    },
+    {
+      "id": "flask_tall",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "potion",
+        "form": "flask_tall"
+      }
+    },
+    {
       "id": "coin",
       "generator": "props",
       "frames": 1,
