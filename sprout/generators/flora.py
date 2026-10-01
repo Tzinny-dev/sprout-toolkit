@@ -4,8 +4,9 @@ Two kinds:
 
     tree    trunk + branches + canopy, three canopy shapes
             (``round`` blob cluster, ``columnar`` poplar, ``conifer``
-            stacked tiers) and two trunk styles (``straight``,
-            ``gnarled`` = lean + kink)
+            stacked tiers), two trunk styles (``straight``, ``gnarled`` =
+            lean + kink) and four maturity stages (``sapling``, ``young``,
+            ``mature``, ``old``) that scale the whole plant
     plant   low undergrowth picked by seed: ``fern``, ``sprout``,
             ``grass`` tuft, ``blossom`` (stem + petals)
 
@@ -38,7 +39,26 @@ TAU = math.tau
 KINDS = ("tree", "plant")
 CANOPY = ("auto", "round", "columnar", "conifer")
 TRUNK = ("auto", "straight", "gnarled")
+AGES = ("auto", "sapling", "young", "mature", "old")
 FORMS = ("auto", "fern", "sprout", "grass", "blossom")
+
+# Maturity stages scale the seeded proportions of a tree. ``mature`` is all
+# 1.0, so it reproduces the historical proportions exactly: an item that pins
+# ``age: mature`` keeps the look it had before the param existed.
+_AGE_MODS = {
+    "sapling": {"trunk_h": 0.55, "trunk_w": 0.60, "canopy_r": 0.66,
+                "branches": 0.50, "n_lobes": 0.85, "lean": 0.60,
+                "kink": 0.60, "fruit_p": 0.0},
+    "young":   {"trunk_h": 0.82, "trunk_w": 0.84, "canopy_r": 0.88,
+                "branches": 0.75, "n_lobes": 0.95, "lean": 0.85,
+                "kink": 0.85, "fruit_p": 0.0},
+    "mature":  {"trunk_h": 1.00, "trunk_w": 1.00, "canopy_r": 1.00,
+                "branches": 1.00, "n_lobes": 1.00, "lean": 1.00,
+                "kink": 1.00, "fruit_p": 1.0},
+    "old":     {"trunk_h": 0.90, "trunk_w": 1.40, "canopy_r": 1.14,
+                "branches": 1.30, "n_lobes": 1.15, "lean": 1.45,
+                "kink": 1.50, "fruit_p": 1.7},
+}
 
 SWAY_AMP = 0.028       # fraction of frame_px
 CANOPY_MARGIN = 0.10   # keep the canopy tip >= 10% below the frame top
@@ -50,20 +70,31 @@ def _pick(opts: tuple[str, ...], vs: int, salt: int) -> str:
     return opts[int(_rnd(vs, salt) * len(opts)) % len(opts)]
 
 
-def _anatomy(vs: int, kind: str) -> dict:
-    """One plant's fixed proportions (no frame index — stable per item)."""
+def _anatomy(vs: int, kind: str, age: str = "auto") -> dict:
+    """One plant's fixed proportions (no frame index — stable per item).
+
+    ``age`` is passed in (rather than overridden after the fact) because the
+    stage scales the seeded values: forcing a stage has to re-apply its
+    multipliers, not just relabel the tree.
+    """
     if kind == "tree":
+        if age == "auto":
+            age = _pick(AGES[1:], vs, 13)
+        m = _AGE_MODS[age]
         return {
+            "age": age,
             "canopy": _pick(CANOPY[1:], vs, 11),
             "trunk": _pick(TRUNK[1:], vs, 12),
-            "trunk_h": 0.26 + _rnd(vs, 31) * 0.14,
-            "trunk_w": 0.075 + _rnd(vs, 32) * 0.040,
-            "canopy_r": 0.22 + _rnd(vs, 33) * 0.08,
-            "lean": (_rnd(vs, 34) - 0.5) * 0.16,
-            "kink": (_rnd(vs, 35) - 0.5) * 0.22,
-            "n_lobes": 4 + int(_rnd(vs, 36) * 4),
-            "branches": 2 + int(_rnd(vs, 37) * 3),
-            "fruit": _rnd(vs, 38) > 0.55,
+            "trunk_h": (0.26 + _rnd(vs, 31) * 0.14) * m["trunk_h"],
+            "trunk_w": (0.075 + _rnd(vs, 32) * 0.040) * m["trunk_w"],
+            "canopy_r": (0.22 + _rnd(vs, 33) * 0.08) * m["canopy_r"],
+            "lean": (_rnd(vs, 34) - 0.5) * 0.16 * m["lean"],
+            "kink": (_rnd(vs, 35) - 0.5) * 0.22 * m["kink"],
+            "n_lobes": max(3, round((4 + int(_rnd(vs, 36) * 4)) * m["n_lobes"])),
+            "branches": max(1, round((2 + int(_rnd(vs, 37) * 3)) * m["branches"])),
+            # keep the original comparison direction so a mature tree keeps
+            # the exact fruit it had before the param existed
+            "fruit": _rnd(vs, 38) > 1.0 - min(1.0, 0.45 * m["fruit_p"]),
         }
     return {
         "form": _pick(_PLANT_FORMS, vs, 11),
@@ -93,7 +124,7 @@ class Flora(Generator):
     id = "flora"
 
     PARAMS = frozenset({
-        "kind", "canopy", "trunk", "form", "sway",
+        "kind", "canopy", "trunk", "age", "form", "sway",
         "fill", "outline", "bark", "accent",
     })
 
@@ -366,8 +397,8 @@ class Flora(Generator):
             raise ValueError(
                 f"invalid flora.kind '{kind}' (available: {', '.join(KINDS)})"
             )
-        for name, vocab in (("canopy", CANOPY), ("trunk", TRUNK),
-                            ("form", FORMS)):
+        for name, vocab in (("canopy", CANOPY), ("trunk", TRUNK), ("age", AGES),
+                             ("form", FORMS)):
             val = str(params.get(name, "auto"))
             if val not in vocab:
                 raise ValueError(
@@ -381,7 +412,9 @@ class Flora(Generator):
             )
 
         vs = (seed * 1000 + base) % 2**31
-        anat = _anatomy(vs, kind)
+        # the stage has to reach _anatomy (it scales the proportions), while
+        # canopy/trunk/form are plain replacements
+        anat = _anatomy(vs, kind, str(params.get("age", "auto")))
         anat["_vs"] = vs
         for name in ("canopy", "trunk", "form"):
             val = str(params.get(name, "auto"))

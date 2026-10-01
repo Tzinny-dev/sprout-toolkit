@@ -5,14 +5,18 @@
   "files": { "atlas": "atlas.png" },
   "layout": { "framePx": 64, "cols": 8, "tileLogical": 32, "sample": "nearest" },
   "items": [
-    { "id": "oak",     "generator": "flora", "frames": 4, "params": { "canopy": "round", "sway": true } },
-    { "id": "poplar",  "generator": "flora", "frames": 1, "params": { "canopy": "columnar" } },
-    { "id": "pine",    "generator": "flora", "frames": 1, "params": { "canopy": "conifer" } },
-    { "id": "gnarled", "generator": "flora", "frames": 1, "params": { "canopy": "round", "trunk": "gnarled" } },
+    { "id": "oak",     "generator": "flora", "frames": 4, "params": { "canopy": "round", "age": "mature", "sway": true } },
+    { "id": "poplar",  "generator": "flora", "frames": 1, "params": { "canopy": "columnar", "age": "mature" } },
+    { "id": "pine",    "generator": "flora", "frames": 1, "params": { "canopy": "conifer", "age": "mature" } },
+    { "id": "gnarled", "generator": "flora", "frames": 1, "params": { "canopy": "round", "trunk": "gnarled", "age": "mature" } },
     { "id": "fern",    "generator": "flora", "frames": 1, "params": { "kind": "plant", "form": "fern" } },
     { "id": "sprout",  "generator": "flora", "frames": 1, "params": { "kind": "plant", "form": "sprout" } },
     { "id": "grass",   "generator": "flora", "frames": 4, "params": { "kind": "plant", "form": "grass", "sway": true } },
-    { "id": "blossom", "generator": "flora", "frames": 1, "params": { "kind": "plant", "form": "blossom" } }
+    { "id": "blossom", "generator": "flora", "frames": 1, "params": { "kind": "plant", "form": "blossom" } },
+    { "id": "sapling",    "generator": "flora", "frames": 1, "params": { "canopy": "round", "age": "sapling" } },
+    { "id": "young_birch", "generator": "flora", "frames": 1, "params": { "canopy": "columnar", "age": "young" } },
+    { "id": "old_oak",    "generator": "flora", "frames": 1, "params": { "canopy": "round", "trunk": "gnarled", "age": "old" } },
+    { "id": "elder_pine", "generator": "flora", "frames": 1, "params": { "canopy": "conifer", "age": "old" } }
   ],
   "animations": {
     "sway":      { "frames": "oak",   "fps": 4, "loop": true },

@@ -9,7 +9,7 @@ import pytest
 
 from sprout.cli import _generate
 from sprout.generators import GENERATORS
-from sprout.generators.flora import CANOPY, FORMS, KINDS, TRUNK, Flora, _anatomy
+from sprout.generators.flora import AGES, CANOPY, FORMS, KINDS, TRUNK, Flora, _anatomy
 
 SPEC = Path(__file__).resolve().parents[1] / "specs" / "flora.json"
 
@@ -71,7 +71,8 @@ def test_invalid_kind_raises() -> None:
 
 
 @pytest.mark.parametrize("name, bad", [
-    ("canopy", "spherical"), ("trunk", "spiral"), ("form", "cactus"),
+    ("canopy", "spherical"), ("trunk", "spiral"), ("age", "ancient"),
+    ("form", "cactus"),
 ])
 def test_invalid_style_raises(name: str, bad: str) -> None:
     with pytest.raises(ValueError, match=name):
@@ -126,6 +127,81 @@ def test_trunk_style_changes_output() -> None:
     gnarled = Flora().generate(3, 1, 64, {"trunk": "gnarled"})
     straight = Flora().generate(3, 1, 64, {"trunk": "straight"})
     assert gnarled[0].image.tobytes() != straight[0].image.tobytes()
+
+
+# ── Maturity stages ────────────────────────────────────────────────────
+@pytest.mark.parametrize("age", AGES[1:])
+def test_all_ages_render_nonempty(age: str) -> None:
+    frame = Flora().generate(2, 1, 64, {"kind": "tree", "age": age,
+                                        "canopy": "round"})[0]
+    assert frame.image.getchannel("A").getbbox() is not None
+
+
+def test_age_changes_output() -> None:
+    base = {"kind": "tree", "canopy": "round", "trunk": "straight"}
+    seen = {Flora().generate(3, 1, 64, {**base, "age": a})[0].image.tobytes()
+            for a in AGES[1:]}
+    assert len(seen) == len(AGES) - 1
+
+
+def test_stage_scales_the_silhouette() -> None:
+    """A sapling is shorter than a mature tree; an old one is wider and
+    carries more mass, not just more height."""
+    base = {"kind": "tree", "canopy": "round", "trunk": "straight"}
+
+    def metrics(age: str) -> tuple[float, float, float]:
+        h = w = area = 0.0
+        for seed in range(1, 21):
+            img = Flora().generate(seed, 1, 64, {**base, "age": age})[0].image
+            x0, y0, x1, y1 = img.getbbox()
+            h += y1 - y0
+            w += x1 - x0
+            area += sum(1 for v in img.getchannel("A").getdata() if v > 0)
+        n = 20
+        return h / n, w / n, area / n
+
+    sap_h, _, sap_a = metrics("sapling")
+    mat_h, mat_w, mat_a = metrics("mature")
+    old_h, old_w, old_a = metrics("old")
+
+    assert sap_h < mat_h, "a sapling is not shorter than a mature tree"
+    assert sap_a < mat_a, "a sapling is not lighter than a mature tree"
+    assert old_w > mat_w, "an old tree is not broader than a mature one"
+    assert old_a > mat_a, "an old tree carries no more mass than a mature one"
+
+
+def test_stage_keeps_the_frame_inside() -> None:
+    """Bigger stages grow the canopy downward, not past the frame."""
+    for age in AGES[1:]:
+        for canopy in CANOPY[1:]:
+            for seed in (1, 4, 9):
+                img = Flora().generate(seed, 1, 64,
+                                       {"kind": "tree", "age": age,
+                                        "canopy": canopy})[0].image
+                x0, y0, x1, y1 = img.getbbox()
+                assert y0 >= 5, f"{age}/{canopy} touches the top ({y0})"
+                assert x0 >= 0 and x1 <= 64, f"{age}/{canopy} overflows a side"
+                assert y1 <= 64, f"{age}/{canopy} overflows the bottom ({y1})"
+
+
+def test_forced_age_overrides_the_seed() -> None:
+    """The stage scales the proportions, so it has to reach ``_anatomy``
+    instead of relabelling a finished tree."""
+    sapling = _anatomy(7, "tree", "sapling")
+    mature = _anatomy(7, "tree", "mature")
+    assert sapling["age"] == "sapling" and mature["age"] == "mature"
+    # everything else about the seed is untouched
+    assert sapling["canopy"] == mature["canopy"]
+    assert sapling["trunk"] == mature["trunk"]
+    # only the scaled proportions differ
+    assert sapling["trunk_h"] < mature["trunk_h"]
+    assert sapling["canopy_r"] < mature["canopy_r"]
+    assert sapling["trunk_w"] < mature["trunk_w"]
+
+
+def test_auto_age_is_always_a_known_stage() -> None:
+    for vs in range(50):
+        assert _anatomy(vs, "tree")["age"] in AGES[1:]
 
 
 # ── Sway animation ─────────────────────────────────────────────────────
@@ -228,7 +304,8 @@ def test_manifest_frames_and_shape(tmp_path: Path) -> None:
     out = tmp_path / "out"
     _generate(SPEC, out, None, False)
     m = json.loads((out / "manifest.json").read_text())
-    assert len(m["frames"]) == 4 + 3 + 3 + 4  # oak, canopy trees, plants, grass
+    items = json.loads(SPEC.read_text())["items"]
+    assert len(m["frames"]) == sum(it["frames"] for it in items)
     ids = {f["id"] for f in m["frames"]}
     assert "oak_00" in ids and "oak_03" in ids
     assert "grass_03" in ids and "blossom_00" in ids
