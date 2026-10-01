@@ -63,9 +63,9 @@ PNG_MODES = ("rgba", "png8", "png24")
 
 def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
               skip_existing: bool, png_mode: str = "rgba",
-              texturepacker: bool = False, mipmaps: bool = False,
-              mip_levels: int = 3, frame_px: int | None = None,
-              silhouette: bool = False) -> dict:
+               texturepacker: bool = False, mipmaps: bool = False,
+               mip_levels: int = 3, frame_px: int | None = None,
+               silhouette: bool = False, supersample: int = 1) -> dict:
     spec = load_spec(spec_path)
     if seed is not None:
         spec.seed = seed
@@ -73,9 +73,11 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
         if frame_px < 8 or frame_px > 4096:
             raise SpecError(f"invalid --frame-px: {frame_px} (8..4096)")
         spec.layout.frame_px = frame_px
+    if supersample < 1 or supersample > 8:
+        raise SpecError(f"invalid --supersample: {supersample} (1..8)")
 
-    frames = render_items(spec)
-    sheet, records = build_sheet(spec, frames)
+    frames = render_items(spec, supersample)
+    sheet, records = build_sheet(spec, frames, supersample)
     out = out_dir if out_dir is not None else spec_path.parent
     atlas_name = spec.filename
     atlas_path = out / atlas_name
@@ -85,7 +87,7 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
     sil_path = out / "silhouette.png" if silhouette else None
 
     autotile_map = build_autotile_map(spec, frames)
-    font_map = build_font_map(spec, frames)
+    font_map = build_font_map(spec, frames, supersample)
     shader_source, shader_block = build_shader(spec)
     shader_path = out / shader_filename(spec) if shader_block else None
     tier_shaders = build_tier_shaders(spec)
@@ -219,6 +221,7 @@ def generate(
     frame_px: int = typer.Option(None, "--frame-px", help="override layout.framePx (single-resolution output)"),
     silhouette: bool = typer.Option(False, "--silhouette", help="also emit silhouette.png (black x alpha) + SILHOUETTE_SOURCE"),
     tiers: str = typer.Option(None, "--tiers", help="one atlas per px size, e.g. 64,128,256 — subdirs + combined index.ts"),
+    supersample: int = typer.Option(1, "--supersample", help="render at Nx framePx and box-filter back down, for smooth curves (1..8)"),
 ) -> None:
     """Generate spritesheet + manifest.json + index.ts from a spec."""
     if png_mode not in PNG_MODES:
@@ -237,7 +240,8 @@ def generate(
             for px in px_list:
                 r = _generate(spec, dest / str(px), seed, skip_existing,
                               png_mode, texturepacker, mipmaps, mipmap_levels,
-                              frame_px=px, silhouette=silhouette)
+                              frame_px=px, silhouette=silhouette,
+                              supersample=supersample)
                 results.append((px, r["manifest"]))
         except SpecError as e:
             typer.secho(f"error in {spec}: {e}", fg=typer.colors.RED, err=True)
@@ -252,7 +256,7 @@ def generate(
     try:
         r = _generate(spec, out, seed, skip_existing, png_mode, texturepacker,
                       mipmaps, mipmap_levels, frame_px=frame_px,
-                      silhouette=silhouette)
+                      silhouette=silhouette, supersample=supersample)
     except SpecError as e:
         typer.secho(f"error in {spec}: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)

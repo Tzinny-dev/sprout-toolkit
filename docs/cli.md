@@ -36,12 +36,37 @@ sprout generate specs/demo.json --tiers 64,128,256 --out ./tiers
 # Single-resolution override: sister outputs without editing the spec
 sprout generate specs/demo.json --frame-px 128 --out ./out-128
 
+# Smooth curves: render at 4x and box-filter back down to the same framePx
+sprout generate specs/demo.json --supersample 4 --out ./out-smooth
+
 # Prebaked silhouette mask (black x alpha) alongside the atlas
 sprout generate specs/demo.json --silhouette --out ./out
 ```
 
 `--tiers` and `--frame-px` are mutually exclusive. `--silhouette` also works
 with `batch` and with `--tiers` (one `silhouette.png` per tier).
+
+#### `--supersample <1..8>`
+
+PIL's drawing primitives are aliased, so a curve drawn straight at 64 px keeps
+its stair-steps however few pixels it spans. **Raising `framePx` does not fix
+this** — the shipped specs sample with `nearest`, and point sampling discards
+the extra pixels instead of averaging them, so a 128 px source displayed at
+`tileLogical: 32` looks exactly as jagged as the 64 px one. Supersampling
+renders at `framePx × N` and reduces each `N × N` block with a box filter,
+which is what actually creates the intermediate edge pixels.
+
+The output is unchanged in logical terms: `framePx`, `atlasW`/`atlasH` and
+every record's `x`/`y`/`w`/`h` stay put, and anchors and font advances — which
+generators measure in frame pixels — are divided back down. Only the pixels
+change. `--supersample 1` is the default and writes the exact bytes a plain
+`generate` would.
+
+N=4 is the useful setting: it captures most of the benefit (on `critter`, 5.2%
+of pixels land on a partial alpha versus 3.4% at N=2 and only 5.9% at N=8) for
+16× the transient memory of the render, not of the atlas. Cost is PNG size
+instead — the 13 bundled specs go from 216 KB to 416 KB. The 8× cap is
+there to bound a squared factor, not because 8 is useful.
 
 ### `sprout batch <dir>`
 

@@ -52,13 +52,25 @@ def _frame_ids(item_id: str, count: int) -> list[str]:
     return [f"{item_id}_{i:02d}" for i in range(count)]
 
 
-def render_items(spec: Spec) -> list[list[FrameData]]:
-    """Generates frames for all items, in spec order."""
+def render_items(spec: Spec, supersample: int = 1) -> list[list[FrameData]]:
+    """Generates frames for all items, in spec order.
+
+    ``supersample`` renders at ``frame_px * supersample`` so ``build_sheet``
+    can box-filter the blocks back down. PIL's drawing primitives are aliased,
+    so a curve drawn straight at 64 px keeps its stair-steps however few pixels
+    it spans; raising ``framePx`` and sampling with ``nearest`` does not help
+    either, since point sampling throws the extra pixels away instead of
+    averaging them. Every generator scales its geometry with ``frame_px``, so
+    supersampling needs no per-generator support. Metadata measured in frame
+    pixels (anchors, font advances) comes back at the larger scale and is
+    divided back down by ``build_sheet`` / ``build_font_map``.
+    """
+    frame_px = spec.layout.frame_px * supersample
     out: list[list[FrameData]] = []
     offset = 0
     for item in spec.items:
         gen = get_generator(item.generator)()
-        frames = gen.generate(spec.seed, item.frames, spec.layout.frame_px,
+        frames = gen.generate(spec.seed, item.frames, frame_px,
                               item.params, base=offset)
         for fid, fr in zip(_frame_ids(item.id, item.frames), frames, strict=True):
             fr.id = fid
@@ -67,27 +79,47 @@ def render_items(spec: Spec) -> list[list[FrameData]]:
     return out
 
 
-def build_sheet(spec: Spec, items_frames: list[list[FrameData]]) -> tuple[Image.Image, list[dict]]:
-    """Packs frames into a row-major grid -> (RGBA sheet, records with coords)."""
+def build_sheet(spec: Spec, items_frames: list[list[FrameData]],
+                supersample: int = 1) -> tuple[Image.Image, list[dict]]:
+    """Packs frames into a row-major grid -> (RGBA sheet, records with coords).
+
+    With ``supersample > 1`` the frames arrive at ``frame_px * supersample``
+    (see ``render_items``) and the sheet is built at that size, then reduced by
+    a whole number of pixels per block. Records come out in logical frame
+    pixels either way, so the manifest, the texturepacker sheet and the mipmap
+    chain are unaffected by the flag. Pillow premultiplies alpha while
+    resampling, so the reduced sheet keeps its edge colour instead of averaging
+    in the (0, 0, 0, 0) background.
+    """
     cols = spec.layout.cols
     frame = spec.layout.frame_px
+    big = frame * supersample
     rows = spec.layout.resolve_rows(spec.total_frames)
-    sheet = Image.new("RGBA", (cols * frame, rows * frame), (0, 0, 0, 0))
+    sheet = Image.new("RGBA", (cols * big, rows * big), (0, 0, 0, 0))
     records: list[dict] = []
     i = 0
     for frames in items_frames:
         for fr in frames:
             col, row = i % cols, i // cols
-            x, y = col * frame, row * frame
+            x, y = col * big, row * big
             sheet.paste(fr.image, (x, y), fr.image if fr.image.mode == "RGBA" else None)
             record = {
                 "id": fr.id, "col": col, "row": row,
-                "x": x, "y": y, "w": frame, "h": frame,
+                "x": col * frame, "y": row * frame, "w": frame, "h": frame,
             }
             if "anchor" in fr.meta:
-                record["anchor"] = fr.meta["anchor"]
+                anchor = fr.meta["anchor"]
+                # Only divide when there is something to divide by: an int
+                # anchor survives supersample=1 untouched, and ``55 / 1``
+                # would otherwise serialise as ``55.0`` and change the
+                # manifest of an atlas whose pixels never moved.
+                if supersample > 1:
+                    anchor = {k: v / supersample for k, v in anchor.items()}
+                record["anchor"] = anchor
             records.append(record)
             i += 1
+    if supersample > 1:
+        sheet = sheet.resize((cols * frame, rows * frame), Image.BOX)
     return sheet, records
 
 
@@ -104,8 +136,16 @@ def build_autotile_map(spec: Spec, items_frames: list[list[FrameData]]) -> dict:
     return {"bitmask": autotile.BITMASK, "items": items} if items else {}
 
 
-def build_font_map(spec: Spec, items_frames: list[list[FrameData]]) -> dict:
-    """Manifest `font` block: item -> {ascent, descent, glyphs}."""
+def build_font_map(spec: Spec, items_frames: list[list[FrameData]],
+                   supersample: int = 1) -> dict:
+    """Manifest `font` block: item -> {ascent, descent, glyphs}.
+
+    ``ascent``/``descent`` are measured here from ``spec.layout.frame_px``, so
+    they are already logical. ``advance`` comes from the generator, which drew
+    at the supersampled size, so it is the one metric that needs dividing back
+    down -- it can land a pixel off the 1x value, which is inherent to sizing a
+    glyph N times up and averaging it back down.
+    """
     items: dict[str, dict] = {}
     for item, frames in zip(spec.items, items_frames, strict=True):
         if item.generator != "font":
@@ -118,7 +158,8 @@ def build_font_map(spec: Spec, items_frames: list[list[FrameData]]) -> dict:
             "ascent": ascent,
             "descent": descent,
             "glyphs": {
-                fr.meta["char"]: {"id": fr.id, "advance": fr.meta["advance"]}
+                fr.meta["char"]: {"id": fr.id,
+                                  "advance": round(fr.meta["advance"] / supersample)}
                 for fr in frames
             },
         }

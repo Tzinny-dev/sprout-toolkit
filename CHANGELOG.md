@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- **`sprout generate --supersample <1..8>`**: render each frame at
+  `framePx × N` and box-filter the blocks back down to the same `framePx`.
+  PIL's primitives are aliased, so every curve in the toolkit stair-steps —
+  and raising `framePx` does not help, because the specs sample with
+  `nearest` and point sampling drops the extra pixels rather than averaging
+  them. Measured on `critter`: at N=1 zero pixels have a partial alpha and
+  the frame holds 8 colours; at N=4, 5.2% of pixels are antialiased edges
+  and it holds 562. So `nearest` plus a bigger source is the same atlas with
+  more memory spent, and this is the flag that actually changes pixels.
+
+  The output is logically untouched — `framePx`, `atlasW`/`atlasH` and every
+  record's `x`/`y`/`w`/`h` are the same, and anchors and font advances, which
+  generators report in frame pixels, are divided back down. `N=1` is the
+  default and writes the exact bytes an unflagged `generate` would (all 13
+  specs still byte-identical). No premultiplication is needed: Pillow
+  premultiplies alpha while resampling, so the reduced sheet keeps its edge
+  colour instead of averaging in the `(0, 0, 0, 0)` background — verified by
+  filling transparent pixels red, green and white and getting the same
+  result. N=4 is the useful setting (5.2% vs 3.4% at N=2 and 5.9% at N=8) for
+  16x the *transient* memory; the real cost is PNG size, 216 KB to 416 KB
+  across the 13 bundled specs. The 8x cap bounds a squared factor, not a
+  recommendation. Tests: `test_supersample.py` (12).
 - **`sprout diversity <spec>`**: measure form coverage — which items share
   the same form. Groups items by generator, frame count, autotile and
   structural params, dropping palettes, colour literals and the `tint`
