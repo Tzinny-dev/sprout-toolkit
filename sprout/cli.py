@@ -9,6 +9,7 @@ Usage:
   sprout watch specs/ --out ../demo/assets/procgen
   sprout info specs/demo.json [--json]
   sprout lint specs/demo.json [--json]
+  sprout diversity specs/demo.json [--json] [--no-fail]
   sprout diff <a> <b> [--json]
   sprout validate specs/demo.json
   sprout validate specs/demo.json --coverage catalog.ts --field key --map mapping.json
@@ -48,7 +49,9 @@ from .exporter import (
     write_png,
     write_texturepacker,
 )
+from .generators import plugin_generator_ids
 from .generators.base import FrameData
+from . import diversity as diversity_mod
 from .spec import Layout, Spec, SpecError, load_spec
 
 app = typer.Typer(add_completion=False, no_args_is_help=True,
@@ -433,6 +436,9 @@ def info(
                f"tileLogical={s.layout.tile_logical} sample={s.layout.sample}")
     typer.echo(f"  atlas   : {s.filename} {atlas_w}x{atlas_h} ({s.total_frames} frames)")
     typer.echo(f"  runtime : {'yes' if s.runtime else 'no'}")
+    plug_ids = plugin_generator_ids()
+    if plug_ids:
+        typer.echo(f"  plugins : {', '.join(plug_ids)}")
     typer.echo("  items:")
     for it in s.items:
         extra = ""
@@ -446,6 +452,54 @@ def info(
         typer.echo("  anim:")
         for name, a in s.animations.items():
             typer.echo(f"    - {name:<14} frames={a.frames} fps={a.fps} loop={a.loop}")
+
+
+@app.command()
+def diversity(
+    spec: Path = typer.Argument(..., help="spec.json to analyze"),
+    as_json: bool = typer.Option(False, "--json", help="machine-readable output"),
+    fail: bool = typer.Option(
+        True, "--fail/--no-fail",
+        help="exit 1 when two items render the same form"),
+) -> None:
+    """Measure form coverage: which items render to the same sprite.
+
+    Renders every item and compares the alpha silhouette downsampled to a
+    16x16 grid. Items whose silhouettes differ by fewer than 12 of 256
+    cells are reported as the same form — a coverage gap, since two
+    species that look identical need a new form or different params.
+    """
+    try:
+        s = load_spec(spec)
+        items_frames = render_items(s)
+    except SpecError as e:
+        typer.secho(f"invalid: {e}", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
+
+    groups = diversity_mod.diversity_groups(s.items, items_frames)
+    distinct = diversity_mod.distinct_forms(items_frames)
+    total = len(s.items)
+
+    if as_json:
+        typer.echo(json.dumps({
+            "spec": str(spec),
+            "items": total,
+            "distinct_forms": distinct,
+            "collisions": [
+                {"items": members} for members in groups
+            ],
+        }, indent=2))
+    elif not groups:
+        msg = (f"[{s.name}] OK — {total} items, {distinct} distinct forms, "
+               f"no collisions")
+        typer.secho(msg, fg=typer.colors.GREEN)
+    else:
+        msg = (f"[{s.name}] {total} items, {distinct} distinct forms, "
+               f"{len(groups)} collision(s):")
+        typer.secho(msg, fg=typer.colors.YELLOW)
+        for members in groups:
+            typer.echo(f"  - {', '.join(members)}")
+    raise typer.Exit(1 if fail and groups else 0)
 
 
 PADDING_WARN_RATIO = 0.25

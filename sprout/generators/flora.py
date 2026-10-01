@@ -92,6 +92,11 @@ class Flora(Generator):
 
     id = "flora"
 
+    PARAMS = frozenset({
+        "kind", "canopy", "trunk", "form", "sway",
+        "fill", "outline", "bark", "accent",
+    })
+
     KIND_DEFAULTS: dict[str, dict] = {
         "tree": {"fill": (94, 152, 78), "bark": (142, 102, 64),
                  "accent": (170, 210, 98)},

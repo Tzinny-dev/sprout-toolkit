@@ -1,0 +1,59 @@
+{
+  "forms": {
+    "rock": ["auto"],
+    "bush": ["auto"],
+    "chest": ["auto"],
+    "mushroom": ["auto"],
+    "flower": ["auto"],
+    "fruit": ["auto", "apple", "cherry", "banana", "grapes", "strawberry"],
+    "sweet": ["auto", "candy", "donut", "cookie", "cupcake", "lollipop"],
+    "potion": ["auto", "bottle", "flask", "vial"],
+    "treasure": ["auto", "coin", "gem", "star", "ring"],
+    "tool": ["auto", "hammer", "key", "pencil", "spoon", "fork"],
+    "paper": ["auto", "book", "scroll", "envelope"],
+    "container": ["auto", "bag", "box"]
+  },
+  "colors": {
+    "fruit": {
+      "apple":      {"fill": [214, 64, 70],   "accent": [96, 160, 76]},
+      "cherry":     {"fill": [200, 44, 66],   "accent": [96, 160, 76]},
+      "banana":     {"fill": [242, 206, 88],  "accent": [150, 110, 64]},
+      "grapes":     {"fill": [140, 94, 182],  "accent": [96, 160, 76]},
+      "strawberry": {"fill": [226, 74, 88],   "accent": [96, 160, 76]}
+    },
+    "sweet": {
+      "candy":   {"fill": [238, 120, 160], "accent": [255, 196, 216]},
+      "donut":   {"fill": [216, 168, 112], "accent": [242, 134, 172]},
+      "cookie":  {"fill": [198, 152, 98],  "accent": [84, 52, 38]},
+      "cupcake": {"fill": [255, 164, 192], "accent": [126, 174, 222]},
+      "lollipop": {"fill": [250, 116, 148], "accent": [255, 238, 242]}
+    },
+    "potion": {
+      "bottle": {"fill": [98, 196, 130],  "accent": [212, 236, 240]},
+      "flask":  {"fill": [146, 110, 214], "accent": [212, 236, 240]},
+      "vial":   {"fill": [240, 186, 74],  "accent": [212, 236, 240]}
+    },
+    "treasure": {
+      "coin": {"fill": [242, 198, 70],  "accent": [206, 156, 44]},
+      "gem":  {"fill": [86, 192, 222],  "accent": [206, 242, 250]},
+      "star": {"fill": [255, 214, 90],  "accent": [255, 244, 206]},
+      "ring": {"fill": [238, 198, 84],  "accent": [226, 92, 122]}
+    },
+    "tool": {
+      "hammer": {"fill": [150, 158, 168], "accent": [142, 98, 60]},
+      "key":    {"fill": [228, 192, 92],  "accent": [186, 144, 64]},
+      "pencil": {"fill": [246, 198, 74],  "accent": [240, 132, 150]},
+      "spoon":  {"fill": [204, 210, 218], "accent": [160, 168, 178]},
+      "fork":   {"fill": [204, 210, 218], "accent": [160, 168, 178]}
+    },
+    "paper": {
+      "book":     {"fill": [194, 84, 94],  "accent": [240, 236, 226]},
+      "scroll":   {"fill": [236, 220, 182], "accent": [198, 162, 112]},
+      "envelope": {"fill": [242, 236, 224], "accent": [214, 92, 96]}
+    },
+    "container": {
+      "bag": {"fill": [208, 172, 118], "accent": [150, 112, 72]},
+      "box": {"fill": [226, 98, 108],  "accent": [250, 240, 230]}
+    }
+  }
+}

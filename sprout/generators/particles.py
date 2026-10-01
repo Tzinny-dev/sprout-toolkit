@@ -42,6 +42,8 @@ class Particles(Generator):
 
     id = "particles"
 
+    PARAMS = frozenset({"kind", "particles", "core", "trail"})
+
     KIND_DEFAULTS: dict[str, dict] = {
         "spark":  {"core": (255, 235, 130), "trail": (255, 130, 30)},
         "smoke":  {"core": (205, 205, 210), "trail": (110, 110, 118)},

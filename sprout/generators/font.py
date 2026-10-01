@@ -46,6 +46,8 @@ class Font(Generator):
 
     id = "font"
 
+    PARAMS = frozenset({"chars", "font_path", "size", "fill"})
+
     def generate(
         self,
         seed: int,

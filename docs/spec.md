@@ -89,6 +89,23 @@ item did not set explicitly — explicit `params.fill`/`outline` always win:
 Built-in palettes: `earth`, `forest`, `ocean`, `candy`. The outline rule is
 `outline = darken(fill, 0.55)`, so every palette stays consistent.
 
+## Params are validated
+
+Each generator declares the `params` keys it reads, so a misspelled key
+fails at load time rather than silently rendering a default sprite. This
+matters most for specs generated from a catalog by `sprout catalog`, where
+a typo would otherwise survive all the way into the atlas:
+
+```console
+$ sprout validate specs/catalog.json
+invalid: item 'frutilla': unknown param(s) for 'props': 'forma'
+         (known: accent, autotile, fill, form, kind, outline, palette)
+```
+
+`palette` and `autotile` belong to the framework, not to a generator, so
+they are accepted everywhere. Plug-in generators that do not declare
+`PARAMS` are not checked.
+
 ## Animations
 
 ```json

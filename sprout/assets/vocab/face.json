@@ -1,0 +1,25 @@
+{
+  "moods": {
+    "neutral":    {"eyes": "open",  "mouth": "flat",   "brows": "none",   "extras": "none"},
+    "happy":      {"eyes": "open",  "mouth": "smile",  "brows": "none",   "extras": "none"},
+    "joy":        {"eyes": "happy", "mouth": "grin",   "brows": "raised", "extras": "none"},
+    "laugh":      {"eyes": "happy", "mouth": "open",   "brows": "raised", "extras": "none"},
+    "sad":        {"eyes": "open",  "mouth": "frown",  "brows": "sad",    "extras": "none"},
+    "cry":        {"eyes": "open",  "mouth": "wavy",   "brows": "sad",    "extras": "tears"},
+    "angry":      {"eyes": "open",  "mouth": "frown",  "brows": "angry",  "extras": "anger"},
+    "scared":     {"eyes": "wide",  "mouth": "open",   "brows": "sad",    "extras": "sweat"},
+    "surprised":  {"eyes": "wide",  "mouth": "open",   "brows": "raised", "extras": "none"},
+    "sleepy":     {"eyes": "closed","mouth": "flat",   "brows": "flat",   "extras": "none"},
+    "wink":       {"eyes": "wink",  "mouth": "smile",  "brows": "none",   "extras": "none"},
+    "love":       {"eyes": "heart", "mouth": "smile",  "brows": "raised", "extras": "blush"},
+    "confused":   {"eyes": "open",  "mouth": "wavy",   "brows": "flat",   "extras": "none"},
+    "worried":    {"eyes": "open",  "mouth": "wavy",   "brows": "sad",    "extras": "sweat"},
+    "determined": {"eyes": "open",  "mouth": "flat",   "brows": "angry",  "extras": "none"},
+    "dizzy":      {"eyes": "x",     "mouth": "wavy",   "brows": "flat",   "extras": "none"}
+  },
+  "heads": ["auto", "round", "oval", "square", "wide"],
+  "eyes": ["auto", "open", "wide", "happy", "closed", "wink", "heart", "x"],
+  "mouths": ["auto", "flat", "smile", "grin", "open", "frown", "wavy", "cat"],
+  "brows": ["auto", "none", "flat", "angry", "sad", "raised"],
+  "extras": ["auto", "none", "blush", "sweat", "tears", "anger"]
+}

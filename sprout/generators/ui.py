@@ -37,6 +37,8 @@ class Ui(Generator):
 
     id = "ui"
 
+    PARAMS = frozenset({"kind", "fill", "outline", "accent"})
+
     KIND_DEFAULTS: dict[str, dict] = {
         "button": {"fill": (90, 130, 210), "outline": (40, 70, 130)},
         "slider": {"fill": (70, 70, 85), "outline": (40, 40, 50), "accent": (90, 200, 120)},

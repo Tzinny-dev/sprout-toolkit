@@ -18,6 +18,8 @@ from .base import FrameData, Generator
 class BlobWalk(Generator):
     id = "blob_walk"
 
+    PARAMS = frozenset({"body", "outline", "belly", "eye", "eye_white"})
+
     DEFAULTS = {
         "body": (244, 162, 97),
         "outline": (46, 36, 24),

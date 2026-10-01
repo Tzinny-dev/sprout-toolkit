@@ -25,38 +25,26 @@ import math
 from PIL import Image, ImageDraw
 
 from .. import palettes
+from .. import vocab as vocab_mod
 from .base import FrameData, Generator
 from .props import _anchor_from_alpha, _rnd
 
 TAU = math.tau
 
-HEADS = ("auto", "round", "oval", "square", "wide")
-EYES = ("auto", "open", "wide", "happy", "closed", "wink", "heart", "x")
-MOUTHS = ("auto", "flat", "smile", "grin", "open", "frown", "wavy", "cat")
-BROWS = ("auto", "none", "flat", "angry", "sad", "raised")
-EXTRAS = ("auto", "none", "blush", "sweat", "tears", "anger")
+# Loaded from assets/vocab/face.json so consumers can extend the emotion
+# vocabulary without forking the toolkit (see sprout/vocab.py).
+_vocab = vocab_mod.load("face")
+
+HEADS = tuple(_vocab["heads"])
+EYES = tuple(_vocab["eyes"])
+MOUTHS = tuple(_vocab["mouths"])
+BROWS = tuple(_vocab["brows"])
+EXTRAS = tuple(_vocab["extras"])
 
 BLINKABLE = ("open", "wide", "wink", "heart")
 
 # name -> coherent parts combination
-MOODS: dict[str, dict[str, str]] = {
-    "neutral":    {"eyes": "open",  "mouth": "flat",   "brows": "none",   "extras": "none"},
-    "happy":      {"eyes": "open",  "mouth": "smile",  "brows": "none",   "extras": "none"},
-    "joy":        {"eyes": "happy", "mouth": "grin",   "brows": "raised", "extras": "none"},
-    "laugh":      {"eyes": "happy", "mouth": "open",   "brows": "raised", "extras": "none"},
-    "sad":        {"eyes": "open",  "mouth": "frown",  "brows": "sad",    "extras": "none"},
-    "cry":        {"eyes": "open",  "mouth": "wavy",   "brows": "sad",    "extras": "tears"},
-    "angry":      {"eyes": "open",  "mouth": "frown",  "brows": "angry",  "extras": "anger"},
-    "scared":     {"eyes": "wide",  "mouth": "open",   "brows": "sad",    "extras": "sweat"},
-    "surprised":  {"eyes": "wide",  "mouth": "open",   "brows": "raised", "extras": "none"},
-    "sleepy":     {"eyes": "closed","mouth": "flat",   "brows": "flat",   "extras": "none"},
-    "wink":       {"eyes": "wink",  "mouth": "smile",  "brows": "none",   "extras": "none"},
-    "love":       {"eyes": "heart", "mouth": "smile",  "brows": "raised", "extras": "blush"},
-    "confused":   {"eyes": "open",  "mouth": "wavy",   "brows": "flat",   "extras": "none"},
-    "worried":    {"eyes": "open",  "mouth": "wavy",   "brows": "sad",    "extras": "sweat"},
-    "determined": {"eyes": "open",  "mouth": "flat",   "brows": "angry",  "extras": "none"},
-    "dizzy":      {"eyes": "x",     "mouth": "wavy",   "brows": "flat",   "extras": "none"},
-}
+MOODS: dict[str, dict[str, str]] = _vocab["moods"]
 
 # head silhouettes: round = radius, others = half extents (fractions of S)
 _HEAD_SHAPES = {
@@ -89,6 +77,12 @@ class Face(Generator):
     """Parametric emotion faces: mood presets + per-part overrides."""
 
     id = "face"
+
+    PARAMS = frozenset({
+        "mood", "head", "eyes", "mouth", "brows", "extras",
+        "fill", "outline", "eye", "eye_white", "accent",
+        "drop", "tongue", "anger",
+    })
 
     DEFAULTS = {
         "fill": (245, 227, 201),      # neutral head tone (tint-friendly)

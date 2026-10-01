@@ -93,6 +93,12 @@ class Critter(Generator):
 
     id = "critter"
 
+    PARAMS = frozenset({
+        "archetype", "facing",
+        "ears", "snout", "tail", "legs", "wings",
+        "fill", "outline", "belly", "eye", "eye_white", "beak",
+    })
+
     DEFAULTS = {
         "fill": (216, 210, 200),       # neutral warm gray (tint-ready)
         "outline": (48, 44, 40),

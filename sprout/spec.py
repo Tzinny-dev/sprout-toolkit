@@ -23,6 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .generators import GENERATORS
+from .generators.base import FRAMEWORK_PARAMS
 from . import palettes, sksl
 
 
@@ -212,6 +213,22 @@ def load_spec(path: Path) -> Spec:
                 f"item '{it_id}': unknown palette {e.args[0]!r} "
                 f"(available: {', '.join(sorted(palettes.PALETTES))})"
             ) from e
+
+        # Validate what the spec actually authored. `resolve_params` may
+        # have injected palette roles the generator does not read (terrain
+        # takes no colors), so those keys are not the author's mistake.
+        written = set(it.get("params", {}) or {}) | (
+            {"autotile"} if autotile is not None else set())
+        unknown = GENERATORS[gen].accepts(
+            {k: v for k, v in it_params.items() if k in written})
+        if unknown:
+            known = sorted((GENERATORS[gen].PARAMS or frozenset())
+                           | FRAMEWORK_PARAMS)
+            shown = ", ".join(repr(k) for k in unknown)
+            raise SpecError(
+                f"item '{it_id}': unknown param(s) for '{gen}': {shown} "
+                f"(known: {', '.join(known)})"
+            )
 
         tint = str(it.get("tint", "none"))
         if tint not in TINT_MODES:

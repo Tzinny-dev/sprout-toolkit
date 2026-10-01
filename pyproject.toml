@@ -44,7 +44,7 @@ sprout = "sprout.cli:app"
 include = ["sprout*"]
 
 [tool.setuptools.package-data]
-sprout = ["assets/fonts/*.ttf", "assets/fonts/*.txt"]
+sprout = ["assets/fonts/*.ttf", "assets/fonts/*.txt", "assets/vocab/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

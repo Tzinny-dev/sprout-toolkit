@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- **`sprout diversity <spec>`**: measure form coverage — which items render
+  to the same sprite. Renders every item and compares the alpha
+  silhouette downsampled to a 16×16 grid; items differing by fewer than
+  12 of 256 cells are reported as the same form. `--json` for machine
+  output, `--no-fail` to report without exiting non-zero (default exits
+  1 on collision, for CI). Generic: no generator knowledge, works for any
+  catalog. Tests: `test_diversity.py` (20).
+- **Data-driven vocabularies**: `props` and `face` load their forms and
+  colors from `assets/vocab/*.json` instead of hardcoding them, so a
+  consumer can extend the toolkit's vocabulary without forking it.
+  `SPROUT_VOCAB_DIR` points at a directory of same-named JSON files that
+  deep-merge over the packaged defaults (lists replace, dicts merge
+  recursively). Colors normalize from JSON `[r,g,b]` to the tuples PIL
+  requires. Tests: `test_vocab.py` (23).
+- **Unknown-param validation**: every built-in generator declares the
+  `item.params` keys it reads (`Generator.PARAMS`), and the spec loader
+  rejects anything else. A typo in a hand-written `mapping.json` — the
+  kind that used to render a plausible-but-wrong sprite — now fails with
+  the offending key and the known ones: `item 'frutilla': unknown param(s)
+  for 'props': 'forma' (known: accent, autotile, fill, form, kind,
+  outline, palette)`. Purely additive: `palette`/`autotile` stay
+  framework-level, palette-expanded color roles are not attributed to the
+  author, and all 13 bundled specs still generate byte-identical atlases.
+  Plug-ins that predate the attribute (`PARAMS = None`) skip the check.
+  Tests: `test_param_validation.py` (23).
+- **Third-party generators via entry points**: a distribution can now add
+  generators to the registry without forking the toolkit, by advertising
+  them under the `sprout.generators` group:
+  `[project.entry-points."sprout.generators"] vehicle = "pkg.mod:Vehicle"`.
+  Discovery is forgiving — a plug-in that fails to import, points at a
+  missing attribute, or exposes a non-`Generator` is skipped instead of
+  breaking the built-ins. Built-in ids always win a collision, so
+  installing a plug-in can never change the output of an existing spec.
+  `sprout info` lists the active plug-in ids; `BUILTIN_GENERATORS` and
+  `plugin_generator_ids()` expose the split. Tests: `test_plugins.py` (21).
+
 ## [0.3.0] — 2026-09-27
 
 First phased release of the 0.3 line (see §6.3 of the project plan):

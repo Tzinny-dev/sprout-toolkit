@@ -83,6 +83,22 @@ sprout lint --json specs/ui.json
 sprout lint --max-atlas-mb 8 specs/tint.json
 ```
 
+### `sprout diversity <spec>`
+
+Form coverage: which items render to the same sprite. Renders every item
+and compares the alpha silhouette on a 16×16 grid; items differing by
+fewer than 12 of 256 cells are the same *form* — a coverage gap, since two
+species that look identical need a new form or different params. Exits 1
+on collision (CI gate); `--no-fail` reports without failing.
+
+```bash
+sprout diversity specs/catalog.json
+sprout diversity --json specs/catalog.json
+sprout diversity --no-fail specs/catalog.json
+```
+
+Generic: no generator knowledge, works for any catalog.
+
 ### `sprout diff <a> <b>`
 
 Compares two specs, or two already-generated output directories (CRC +
@@ -106,6 +122,10 @@ sprout validate specs/catalog.json --coverage catalog.ts --field key --map mappi
 ```
 
 `--map` is optional; its `skip` ids are excluded from the expected set.
+
+Validating also checks each item's `params` against the keys its
+generator actually reads, so a typo in a mapping is reported before it
+reaches the atlas.
 
 ### `sprout catalog <file>`
 

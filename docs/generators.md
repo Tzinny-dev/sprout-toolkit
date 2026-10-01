@@ -21,6 +21,40 @@ See [spec schema](/docs/spec) for `colors` + `tint` (runtime recoloring).
 | `ui` | Button / slider / 9-patch panel | see per-kind |
 | `font` | Bitmap font from TTF, one glyph per frame | `len(chars)` |
 
+Two keys are handled by the framework rather than by a generator:
+`palette` (resolved into unset color roles, see above) and `autotile`
+(injected for `terrain` items). Every other key must be in the table of
+its generator — an unknown one is rejected at load time instead of being
+ignored:
+
+```console
+$ sprout validate specs/catalog.json
+invalid: item 'frutilla': unknown param(s) for 'props': 'forma'
+         (known: accent, autotile, fill, form, kind, outline, palette)
+```
+
+## Writing a generator
+
+A generator is a `Generator` subclass: an `id`, the `PARAMS` surface it
+reads, and a deterministic `generate(seed, count, frame_px, params, base)`.
+Anatomy must derive from the *seed slot* (`seed * 1000 + base`), never the
+frame index, so every frame of an item is the same subject and frames
+differ only by the idle phase.
+
+To publish it outside this repo, advertise it under the
+`sprout.generators` entry-point group:
+
+```toml
+[project.entry-points."sprout.generators"]
+vehicle = "sprout_vehicles:Vehicle"
+```
+
+Installed distributions are discovered on import; `sprout info` lists the
+ids they contribute. A plug-in that raises on import, or exposes a
+non-`Generator`, is skipped — a broken optional dependency never takes the
+built-ins down with it. Built-in ids win a collision, so installing a
+plug-in cannot change the output of an existing spec.
+
 ## `terrain`
 
 Seamless value-noise tiles. With `"autotile": 16` or `47` the item becomes an
@@ -68,6 +102,28 @@ the point where the object touches the ground, for tilemap-aligned placement.
 and thing catalog sets; `form: auto` picks a form per variant from the
 seed, explicit `form` pins it. Example spec: `specs/objects.json`,
 showcase: `docs/showcase/objects.png`.
+
+The vocabulary is data-driven: `props` loads its forms and colors from
+`assets/vocab/props.json`, so a consumer can extend it without forking
+the toolkit. Point `SPROUT_VOCAB_DIR` at a directory with a same-named
+`props.json` and the two are deep-merged (consumer wins):
+
+```json
+{
+  "forms": { "fruit": ["auto", "apple", "cherry", "dragonfruit"] },
+  "colors": { "fruit": { "dragonfruit": { "fill": [200, 50, 200],
+                                            "accent": [100, 200, 100] } } }
+}
+```
+
+Lists are replaced wholesale; dicts merge recursively, so adding one form
+or one color does not require restating the rest.
+
+**Where this helps without new code:** `face` moods are combinations of
+existing parts, so a new mood in `face.json` works immediately. For
+`props`, extending the *colors* of an existing form is enough — a new
+*form* also needs a renderer method (`_dragonfruit`) in the generator,
+which is what plug-ins (above) are for.
 
 | `kind` | forms |
 |---|---|

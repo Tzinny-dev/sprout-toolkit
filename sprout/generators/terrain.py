@@ -108,6 +108,8 @@ def _tile_land(mask: int, size: int, u: float, v: float, bevel: float) -> bool:
 class Terrain(Generator):
     id = "terrain"
 
+    PARAMS = frozenset({"contrast", "lift", "cells", "octaves", "bevel"})
+
     def generate(
         self,
         seed: int,
