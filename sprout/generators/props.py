@@ -538,6 +538,68 @@ class Props(Generator):
         d.polygon([(cx, cy - 0.80 * r), (cx + 0.10 * r, cy - 0.58 * r),
                    (cx - 0.06 * r, cy - 0.55 * r)], fill=_lighten(p["accent"], 0.5))
 
+    # ── tool: treasure variants ───────────────────────────────────────
+    def _coin_small(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                    vs: int, p: dict, ow: int) -> None:
+        # smaller disc with a fine rim and a single notch
+        R = 0.58 * r
+        d.ellipse([cx - R, cy - R, cx + R, cy + R], fill=p["fill"],
+                  outline=p["outline"], width=max(1, ow))
+        rim = 0.40 * R
+        d.ellipse([cx - rim, cy - rim, cx + rim, cy + rim],
+                  outline=palettes.darken(p["fill"], 0.72), width=max(1, ow // 2))
+        d.line([cx, cy - rim * 0.6, cx, cy + rim * 0.6],
+               fill=palettes.darken(p["fill"], 0.78), width=max(1, ow // 2))
+
+    def _coin_thick(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                    vs: int, p: dict, ow: int) -> None:
+        # cylinder: thick edge band below a top disc
+        R = 0.80 * r
+        side = 0.18 * r
+        d.ellipse([cx - R, cy - R + side, cx + R, cy + R + side],
+                  fill=palettes.darken(p["fill"], 0.72), outline=p["outline"],
+                  width=max(1, ow))
+        d.ellipse([cx - R, cy - R, cx + R, cy + R], fill=p["fill"],
+                  outline=p["outline"], width=max(1, ow))
+        rim = 0.58 * R
+        d.ellipse([cx - rim, cy - rim, cx + rim, cy + rim],
+                  outline=palettes.darken(p["fill"], 0.66), width=max(1, ow // 2))
+        emb = 0.36 * R
+        d.polygon(_star_pts(cx, cy, emb, emb * 0.46),
+                  fill=palettes.darken(p["fill"], 0.80))
+
+    def _gem_oval(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                  vs: int, p: dict, ow: int) -> None:
+        # polished oval cabochon with a highlight
+        rx, ry = 0.62 * r, 0.88 * r
+        d.ellipse([cx - rx, cy - ry, cx + rx, cy + ry], fill=p["fill"],
+                  outline=p["outline"], width=max(1, ow))
+        d.ellipse([cx - rx * 0.5, cy - ry * 0.5, cx + rx * 0.5, cy + ry * 0.5],
+                  outline=_lighten(p["fill"], 0.35), width=max(1, ow // 2))
+        hl = 0.16 * r
+        d.ellipse([cx - 0.34 * r - hl, cy - 0.50 * r - hl,
+                   cx - 0.34 * r + hl, cy - 0.50 * r + hl],
+                  fill=_lighten(p["accent"], 0.5))
+
+    def _gem_raw(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                 vs: int, p: dict, ow: int) -> None:
+        # uncut rough stone: irregular facets, no polish
+        pts = [(cx - 0.62 * r, cy - 0.30 * r), (cx - 0.20 * r, cy - 0.72 * r),
+               (cx + 0.38 * r, cy - 0.60 * r), (cx + 0.70 * r, cy + 0.06 * r),
+               (cx + 0.34 * r, cy + 0.74 * r), (cx - 0.30 * r, cy + 0.82 * r),
+               (cx - 0.68 * r, cy + 0.20 * r)]
+        d.polygon(pts, fill=p["fill"], outline=p["outline"], width=max(1, ow))
+        # facet lines
+        d.line([cx - 0.20 * r, cy - 0.72 * r, cx - 0.68 * r, cy + 0.20 * r],
+               fill=palettes.darken(p["fill"], 0.70), width=max(1, ow // 2))
+        d.line([cx + 0.38 * r, cy - 0.60 * r, cx + 0.34 * r, cy + 0.74 * r],
+               fill=palettes.darken(p["fill"], 0.70), width=max(1, ow // 2))
+        d.line([cx - 0.30 * r, cy + 0.82 * r, cx + 0.70 * r, cy + 0.06 * r],
+               fill=palettes.darken(p["fill"], 0.74), width=max(1, int(1.5)))
+        # raw chip highlight
+        d.polygon([(cx - 0.20 * r, cy - 0.72 * r), (cx + 0.06 * r, cy - 0.30 * r),
+                   (cx - 0.34 * r, cy - 0.16 * r)], fill=_lighten(p["accent"], 0.3))
+
     # ── v3 forms: tool ─────────────────────────────────────────────────
     def _hammer(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
                 vs: int, p: dict, ow: int) -> None:

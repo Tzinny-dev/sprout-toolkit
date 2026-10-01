@@ -166,6 +166,42 @@
       }
     },
     {
+      "id": "coin_small",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "treasure",
+        "form": "coin_small"
+      }
+    },
+    {
+      "id": "coin_thick",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "treasure",
+        "form": "coin_thick"
+      }
+    },
+    {
+      "id": "gem_oval",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "treasure",
+        "form": "gem_oval"
+      }
+    },
+    {
+      "id": "gem_raw",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "treasure",
+        "form": "gem_raw"
+      }
+    },
+    {
       "id": "hammer",
       "generator": "props",
       "frames": 1,
