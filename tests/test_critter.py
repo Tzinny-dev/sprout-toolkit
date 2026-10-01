@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
+from sprout import palettes
 from sprout.cli import _generate
 from sprout.generators import GENERATORS
 from sprout.generators.critter import ARCHETYPES, Critter, _anatomy
@@ -66,7 +67,7 @@ def test_invalid_facing_raises() -> None:
 
 @pytest.mark.parametrize("part, bad", [
     ("ears", "floppy"), ("snout", "trunk"), ("tail", "spiral"),
-    ("legs", "wings"), ("wings", "bat"),
+    ("legs", "wings"), ("wings", "bat"), ("pattern", "zigzag"),
 ])
 def test_invalid_part_raises(part: str, bad: str) -> None:
     with pytest.raises(ValueError, match=part):
@@ -143,6 +144,64 @@ def test_part_override_changes_output() -> None:
         forced = Critter().generate(11, 1, 64,
                                     {"archetype": "quadruped", part: val})[0]
         assert base.image.tobytes() != forced.image.tobytes(), f"{part}={val}"
+
+
+# ── Body patterns ──────────────────────────────────────────────────────
+def _silhouette(img) -> tuple:
+    alpha = img.getchannel("A")
+    return (img.getbbox(), sum(1 for v in alpha.getdata() if v > 0))
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+@pytest.mark.parametrize("pattern", ("spots", "stripes", "patch"))
+def test_pattern_never_bleeds_past_the_body(archetype: str, pattern: str) -> None:
+    """Marks are bounded by the body's own ellipse, so they recolor the body
+    without ever growing the silhouette."""
+    for seed in (1, 2, 3, 5, 8):
+        plain = Critter().generate(seed, 1, 64,
+                                   {"archetype": archetype, "pattern": "none"})[0]
+        marked = Critter().generate(seed, 1, 64,
+                                    {"archetype": archetype, "pattern": pattern})[0]
+        assert _silhouette(marked.image) == _silhouette(plain.image), \
+            f"{archetype}/{pattern} at seed {seed} changed the silhouette"
+
+
+@pytest.mark.parametrize("archetype", ARCHETYPES)
+@pytest.mark.parametrize("pattern", ("spots", "stripes", "patch"))
+def test_pattern_is_visible(archetype: str, pattern: str) -> None:
+    """Every pattern must actually mark the body — a pattern that lands on
+    top of the belly would render as a no-op."""
+    far = palettes.darken(Critter.DEFAULTS["fill"], 0.72)
+
+    def far_px(img) -> int:
+        return sum(1 for px in img.getdata() if px[3] > 0 and px[:3] == far)
+
+    plain = far_px(Critter().generate(3, 1, 64,
+                                      {"archetype": archetype, "pattern": "none"})[0].image)
+    marked = far_px(Critter().generate(3, 1, 64,
+                                       {"archetype": archetype, "pattern": pattern})[0].image)
+    assert marked > plain, f"{archetype}/{pattern} drew no marks"
+
+
+def test_pattern_is_stable_across_frames() -> None:
+    """The pattern belongs to the species, not the frame: the breath may
+    nudge a pixel count, but the marks must not slide or vanish."""
+    far = palettes.darken(Critter.DEFAULTS["fill"], 0.72)
+    frames = Critter().generate(4, 4, 64,
+                                {"archetype": "quadruped", "pattern": "stripes"})
+
+    def centroids(img) -> tuple[int, float]:
+        px = img.load()
+        marks = [(x, y) for x in range(64) for y in range(64)
+                 if px[x, y][3] > 0 and px[x, y][:3] == far]
+        assert marks, "the stripes vanished on a frame"
+        n = len(marks)
+        return n, sum(x for x, _ in marks) / n
+
+    seen = [centroids(fr.image) for fr in frames]
+    xs = [cx for _, cx in seen]
+    # the far legs share this shade, so the count breathes; the position must not
+    assert max(xs) - min(xs) <= 1.5, xs
 
 
 def test_forced_parts_override_seed_choice() -> None:
@@ -251,7 +310,8 @@ def test_manifest_frames_and_shape(tmp_path: Path) -> None:
     out = tmp_path / "out"
     _generate(SPEC, out, None, False)
     m = json.loads((out / "manifest.json").read_text())
-    assert len(m["frames"]) == 8 * 4
+    items = json.loads(SPEC.read_text())["items"]
+    assert len(m["frames"]) == sum(it["frames"] for it in items)
     ids = {f["id"] for f in m["frames"]}
     assert "quad_00" in ids and "beetle_03" in ids
     for f in m["frames"]:

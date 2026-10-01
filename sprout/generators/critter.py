@@ -9,8 +9,8 @@ the only angle where beetles read at 64 px):
     reptile     low body + splayed legs + flat head + long tapered tail
     bug         segmented body + head + antennae + 6 legs (top view)
 
-Anatomy (ears / snout / tail / legs / wings and size ratios) derives from
-``seed * 1000 + base`` — the item's slot, never the frame index — so every
+Anatomy (ears / snout / tail / legs / wings / pattern and size ratios) derives
+from ``seed * 1000 + base`` — the item's slot, never the frame index — so every
 frame of an item is the *same* species; only the idle pose changes
 (breathing sine + a one-frame blink). Part params force a value; the
 default ``"auto"`` lets the seed pick among the archetype's options.
@@ -40,24 +40,32 @@ SNOUT = ("auto", "none", "short", "long", "beak")
 TAIL = ("auto", "none", "short", "long", "bushy", "fan")
 LEGS = ("auto", "none", "stubby", "thin", "splayed")
 WINGS = ("auto", "none", "small", "spread")
+PATTERNS = ("auto", "none", "spots", "stripes", "patch")
 FACINGS = ("right", "left")
 
 # Seed picks per archetype when the part param is "auto".
 _AUTO: dict[str, dict[str, tuple[str, ...]]] = {
     "quadruped": {"ears": ("round", "pointy"), "snout": ("short", "long"),
                   "tail": ("short", "bushy"), "legs": ("stubby",),
-                  "wings": ("none",)},
+                  "wings": ("none",),
+                  "pattern": ("none", "spots", "stripes", "patch")},
     "bird": {"ears": ("none",), "snout": ("beak",), "tail": ("fan",),
-             "legs": ("thin",), "wings": ("small", "spread")},
+             "legs": ("thin",), "wings": ("small", "spread"),
+             "pattern": ("none", "stripes")},
     "fish": {"ears": ("none",), "snout": ("none",), "tail": ("fan",),
-             "legs": ("none",), "wings": ("none",)},
+             "legs": ("none",), "wings": ("none",),
+             "pattern": ("none", "spots", "stripes")},
     "reptile": {"ears": ("none",), "snout": ("short",), "tail": ("long", "short"),
-                "legs": ("splayed",), "wings": ("none",)},
+                "legs": ("splayed",), "wings": ("none",),
+                "pattern": ("none", "stripes", "patch")},
     "bug": {"ears": ("none",), "snout": ("none",), "tail": ("none",),
-            "legs": ("thin",), "wings": ("none", "small")},
+            "legs": ("thin",), "wings": ("none", "small"),
+            # the bug already draws its own mirrored elytra spots
+            "pattern": ("none",)},
 }
 
-_PART_SALTS = {"ears": 11, "snout": 12, "tail": 13, "legs": 14, "wings": 15}
+_PART_SALTS = {"ears": 11, "snout": 12, "tail": 13, "legs": 14, "wings": 15,
+               "pattern": 16}
 
 
 def _anatomy(vs: int, archetype: str) -> dict:
@@ -74,6 +82,7 @@ def _anatomy(vs: int, archetype: str) -> dict:
         "tail": pick("tail"),
         "legs": pick("legs"),
         "wings": pick("wings"),
+        "pattern": pick("pattern"),
         "body_len": 0.90 + _rnd(vs, 31) * 0.26,
         "body_h": 0.90 + _rnd(vs, 32) * 0.24,
         "head": 0.90 + _rnd(vs, 33) * 0.26,
@@ -95,7 +104,7 @@ class Critter(Generator):
 
     PARAMS = frozenset({
         "archetype", "facing",
-        "ears", "snout", "tail", "legs", "wings",
+        "ears", "snout", "tail", "legs", "wings", "pattern",
         "fill", "outline", "belly", "eye", "eye_white", "beak",
     })
 
@@ -109,6 +118,56 @@ class Critter(Generator):
     }
 
     # ── Shared face pieces ─────────────────────────────────────────────
+    def _body_marks(self, d: ImageDraw.ImageDraw, bcx: float, bcy: float,
+                    a: float, b: float, anat: dict, p: dict) -> None:
+        """Markings inside the body ellipse, in the ``far`` shade.
+
+        Every shape is bounded by the ellipse's own half-height at that
+        offset (``b * sqrt(1 - (dx/a)^2)``) instead of a mask, so a marking
+        can never bleed past the outline at any frame size.
+        """
+        pattern = anat["pattern"]
+        if pattern == "none":
+            return
+        vs = anat["_vs"]
+
+        def half_h(dx: float) -> float:
+            t = 1.0 - (dx / a) ** 2
+            return b * math.sqrt(t) if t > 0.0 else 0.0
+
+        if pattern == "stripes":
+            n = 3 + int(_rnd(vs, 80) * 2)          # 3..4 bands
+            band = a * 0.13
+            for k in range(n):
+                dx = -a * 0.60 + (k + 0.5) * (a * 1.20 / n)
+                hh = half_h(dx) * 0.78
+                if hh <= 0.0:
+                    continue
+                d.rectangle([bcx + dx - band / 2, bcy - hh,
+                             bcx + dx + band / 2, bcy + hh], fill=p["far"])
+        elif pattern == "spots":
+            n = 3 + int(_rnd(vs, 81) * 3)          # 3..5 dots
+            for k in range(n):
+                dx = -a * 0.58 + _rnd(vs, 82 + k) * a * 1.16
+                hh = half_h(dx)
+                # clamp the dot so it fits the curve, then keep it on the
+                # upper band: the belly is drawn *after* the marks and would
+                # otherwise swallow every dot on a wide, flat body
+                sr = min(a, b) * 0.13
+                if hh <= sr:
+                    continue
+                sr = min(sr, hh * 0.55)
+                sy = bcy - hh * 0.42 + (_rnd(vs, 100 + k) - 0.5) * 0.7 * (hh - sr)
+                d.ellipse([bcx + dx - sr, sy - sr, bcx + dx + sr, sy + sr],
+                          fill=p["far"])
+        elif pattern == "patch":
+            # a saddle over the rear third, inscribed in the body's own curve
+            px = -a * 0.42
+            ph = half_h(px) * 0.82
+            pw = a * 0.48
+            d.ellipse([bcx + px - pw / 2, bcy - ph / 2,
+                       bcx + px + pw / 2, bcy + ph / 2], fill=p["far"])
+
     def _eye(self, d: ImageDraw.ImageDraw, x: float, y: float, r: float,
              p: dict, ow: int, blink: bool) -> None:
         if blink:
@@ -236,6 +295,7 @@ class Critter(Generator):
         d.ellipse([bcx - body_w / 2, bcy - body_h / 2, bcx + body_w / 2,
                    bcy + body_h / 2], fill=p["fill"], outline=p["outline"],
                   width=ow)
+        self._body_marks(d, bcx, bcy, body_w / 2, body_h / 2, anat, p)
         bw, bh = body_w * 0.62, body_h * 0.56
         d.ellipse([bcx - bw / 2, bcy + body_h * 0.14 - bh / 2,
                    bcx + bw / 2, bcy + body_h * 0.14 + bh / 2], fill=p["belly"])
@@ -288,6 +348,7 @@ class Critter(Generator):
         d.ellipse([bcx - body_w / 2, bcy - body_h / 2, bcx + body_w / 2,
                    bcy + body_h / 2], fill=p["fill"], outline=p["outline"],
                   width=ow)
+        self._body_marks(d, bcx, bcy, body_w / 2, body_h / 2, anat, p)
 
         # wing: small, low on the back — a big centered oval reads as a
         # second body, not a wing
@@ -326,6 +387,7 @@ class Critter(Generator):
         d.ellipse([bcx - body_w / 2, cy - body_h / 2, bcx + body_w / 2,
                    cy + body_h / 2], fill=p["fill"], outline=p["outline"],
                   width=ow)
+        self._body_marks(d, bcx, cy, body_w / 2, body_h / 2, anat, p)
 
         # pectoral fin: a small fin sweeping back-down (an ellipse here
         # reads as a spot punched through the body)
@@ -375,6 +437,7 @@ class Critter(Generator):
         d.ellipse([bcx - body_w / 2, bcy - body_h / 2, bcx + body_w / 2,
                    bcy + body_h / 2], fill=p["fill"], outline=p["outline"],
                   width=ow)
+        self._body_marks(d, bcx, bcy, body_w / 2, body_h / 2, anat, p)
         bw, bh = body_w * 0.60, body_h * 0.50
         d.ellipse([bcx - bw / 2, bcy + body_h * 0.12 - bh / 2,
                    bcx + bw / 2, bcy + body_h * 0.12 + bh / 2], fill=p["belly"])
@@ -423,6 +486,7 @@ class Critter(Generator):
 
         d.ellipse([cx - ab_w / 2, cy - ab_h / 2, cx + ab_w / 2, cy + ab_h / 2],
                   fill=p["fill"], outline=p["outline"], width=ow)
+        self._body_marks(d, cx, cy, ab_w / 2, ab_h / 2, anat, p)
 
         # elytra seam / spots (top view: spots mirror across the spine)
         if anat["wings"] == "small":
@@ -475,7 +539,8 @@ class Critter(Generator):
         anat = _anatomy(vs, archetype)
         anat["_vs"] = vs
         for part, allowed in (("ears", EARS), ("snout", SNOUT), ("tail", TAIL),
-                              ("legs", LEGS), ("wings", WINGS)):
+                              ("legs", LEGS), ("wings", WINGS),
+                              ("pattern", PATTERNS)):
             val = str(params.get(part, "auto"))
             if val not in allowed:
                 raise ValueError(

@@ -12,7 +12,13 @@
     { "id": "bug",    "generator": "critter", "frames": 4, "params": { "archetype": "bug" } },
     { "id": "bunny",  "generator": "critter", "frames": 4, "params": { "archetype": "quadruped", "ears": "long", "tail": "bushy", "snout": "long" } },
     { "id": "fox",    "generator": "critter", "frames": 4, "params": { "archetype": "quadruped", "ears": "pointy", "tail": "long", "facing": "left" } },
-    { "id": "beetle", "generator": "critter", "frames": 4, "params": { "archetype": "bug", "wings": "small" } }
+    { "id": "beetle", "generator": "critter", "frames": 4, "params": { "archetype": "bug", "wings": "small" } },
+    { "id": "zebra",   "generator": "critter", "frames": 4, "params": { "archetype": "quadruped", "snout": "long", "pattern": "stripes" } },
+    { "id": "leopard", "generator": "critter", "frames": 4, "params": { "archetype": "quadruped", "ears": "round", "pattern": "spots" } },
+    { "id": "horse",   "generator": "critter", "frames": 4, "params": { "archetype": "quadruped", "tail": "long", "pattern": "patch" } },
+    { "id": "turtle",  "generator": "critter", "frames": 4, "params": { "archetype": "reptile", "pattern": "patch" } },
+    { "id": "eel",     "generator": "critter", "frames": 4, "params": { "archetype": "fish", "pattern": "stripes" } },
+    { "id": "penguin", "generator": "critter", "frames": 4, "params": { "archetype": "bird", "pattern": "stripes" } }
   ],
   "animations": { "idle": { "frames": "quad", "fps": 6, "loop": true } }
 }
