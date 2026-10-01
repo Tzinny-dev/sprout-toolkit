@@ -3,107 +3,187 @@ from __future__ import annotations
 
 import json
 
-import pytest
-from PIL import Image
 from typer.testing import CliRunner
 
 from sprout import diversity
-from sprout.exporter import FrameData
 from sprout.cli import app
 from sprout.spec import Item
 
 runner = CliRunner()
 
 
-def _img(alpha: int, size: int = 32) -> Image.Image:
-    return Image.new("RGBA", (size, size), (0, 0, 0, alpha))
-
-
-def _item(iid: str, generator: str = "props") -> Item:
-    return Item(id=iid, generator=generator, frames=1, params={})
+def _item(iid: str, generator: str = "props", frames: int = 1,
+          params: dict | None = None, autotile: int | None = None,
+          tint: str = "none") -> Item:
+    return Item(id=iid, generator=generator, frames=frames,
+                params=params or {}, autotile=autotile, tint=tint)
 
 
 # ── form_signature ──────────────────────────────────────────────────────
 
 def test_signature_is_deterministic():
-    assert diversity.form_signature(_img(255)) == diversity.form_signature(_img(255))
+    a = _item("a", params={"kind": "sweet", "form": "cookie"})
+    assert diversity.form_signature(a) == diversity.form_signature(a)
 
 
-def test_signature_depends_on_alpha_not_color():
-    """Tint is a runtime dimension; the form is the silhouette."""
-    red = Image.new("RGBA", (32, 32), (255, 0, 0, 255))
-    blue = Image.new("RGBA", (32, 32), (0, 0, 255, 255))
-    assert diversity.form_signature(red) == diversity.form_signature(blue)
+def test_signature_ignores_params_dict_order():
+    a = _item("a", params={"kind": "sweet", "form": "cookie"})
+    b = _item("b", params={"form": "cookie", "kind": "sweet"})
+    assert diversity.form_signature(a) == diversity.form_signature(b)
 
 
-def test_signature_differs_for_different_silhouettes():
-    solid = _img(255)
-    hollow = Image.new("RGBA", (32, 32), (0, 0, 0, 0))
-    hollow.paste((0, 0, 0, 255), (8, 8, 24, 24))
-    assert diversity.form_signature(solid) != diversity.form_signature(hollow)
+def test_signature_differs_on_generator():
+    a = _item("a", generator="props", params={"form": "cookie"})
+    b = _item("b", generator="face", params={"form": "cookie"})
+    assert diversity.form_signature(a) != diversity.form_signature(b)
 
 
-def test_signature_handles_non_rgba_images():
-    """terrain emits images without an alpha channel."""
-    rgb = Image.new("RGB", (32, 32), (120, 120, 120))
-    assert len(diversity.form_signature(rgb)) == diversity.FORM_GRID ** 2
+def test_signature_differs_on_frames():
+    """A 4-frame blink of happy is not the 1-frame still of happy."""
+    a = _item("happy", frames=1, params={"mood": "happy"})
+    b = _item("blink", frames=4, params={"mood": "happy"})
+    assert diversity.form_signature(a) != diversity.form_signature(b)
 
 
-def test_signature_length_is_grid_squared():
-    assert len(diversity.form_signature(_img(255))) == 256
+def test_signature_differs_on_autotile():
+    a = _item("a", autotile=47, params={"kind": "stone"})
+    b = _item("b", params={"kind": "stone"})
+    assert diversity.form_signature(a) != diversity.form_signature(b)
 
 
-# ── hamming ─────────────────────────────────────────────────────────────
-
-def test_hamming_is_zero_for_identical():
-    assert diversity.hamming(b"\x00" * 256, b"\x00" * 256) == 0
-
-
-def test_hamming_counts_differing_bits():
-    assert diversity.hamming(b"\x00", b"\xff") == 8
+def test_signature_differs_on_structural_param():
+    a = _item("a", params={"form": "cookie"})
+    b = _item("b", params={"form": "donut"})
+    assert diversity.form_signature(a) != diversity.form_signature(b)
 
 
-def test_hamming_is_symmetric():
-    a, b = b"\x0f" * 256, b"\xf0" * 256
-    assert diversity.hamming(a, b) == diversity.hamming(b, a) == 2048
+def test_signature_ignores_missing_and_empty_params():
+    assert (diversity.form_signature(_item("a"))
+            == diversity.form_signature(_item("b")))
+
+
+def test_signature_ignores_palette():
+    """A palette is colours only — same form, repainted."""
+    a = _item("a", params={"kind": "earth", "palette": "earth"})
+    b = _item("b", params={"kind": "earth", "palette": "ocean"})
+    assert diversity.form_signature(a) == diversity.form_signature(b)
+
+
+def test_signature_ignores_color_literal_values():
+    a = _item("a", params={"form": "gem", "fill": "#88ccff"})
+    b = _item("b", params={"form": "gem", "fill": [0.5, 0.8, 1.0]})
+    assert diversity.form_signature(a) == diversity.form_signature(b)
+
+
+def test_signature_ignores_item_tint_field():
+    """tint only declares runtime recolouring, it is not the form."""
+    a = _item("a", tint="shade", params={"form": "gem"})
+    b = _item("b", tint="full", params={"form": "gem"})
+    assert diversity.form_signature(a) == diversity.form_signature(b)
+
+
+def test_signature_keeps_non_color_lists():
+    a = _item("a", params={"eyes": ["open", "shut", "wide"]})
+    b = _item("b", params={"eyes": ["open", "shut"]})
+    assert diversity.form_signature(a) != diversity.form_signature(b)
+
+
+def test_signature_freezes_nested_values():
+    """Nested params must stay hashable so signatures can be compared."""
+    sig = diversity.form_signature(_item("a", params={"shape": {"r": 1}}))
+    assert sig == diversity.form_signature(_item("b", params={"shape": {"r": 1}}))
+    assert diversity.form_signature(_item("c", params={"shape": {"r": 2}})) != sig
+
+
+# ── is_color ────────────────────────────────────────────────────────────
+
+def test_is_color_hex_string():
+    assert diversity.is_color("#a1b2c3")
+
+
+def test_is_color_rgb_triple():
+    assert diversity.is_color([1.0, 0.5, 0.0])
+    assert diversity.is_color((255, 128, 0))
+
+
+def test_is_color_rgba_quadruple():
+    assert diversity.is_color([1.0, 0.5, 0.0, 0.5])
+
+
+def test_is_not_color_scalars_and_names():
+    assert not diversity.is_color("earth")
+    assert not diversity.is_color(42)
+    assert not diversity.is_color(True)
+    assert not diversity.is_color(None)
+
+
+def test_is_not_color_list_of_strings():
+    assert not diversity.is_color(["open", "shut"])
+    assert not diversity.is_color([True, False, True])
 
 
 # ── diversity_groups ────────────────────────────────────────────────────
 
-def _frames(alpha: int) -> list[FrameData]:
-    return [FrameData(id="", image=_img(alpha))]
-
-
 def test_no_collisions_when_all_forms_differ():
-    items = [_item("a"), _item("b"), _item("c")]
-    frames = [_frames(255), _frames(128), _frames(0)]
-    assert diversity.diversity_groups(items, frames) == []
+    items = [_item("a", params={"form": "cookie"}),
+             _item("b", params={"form": "donut"}),
+             _item("c", params={"form": "gem"})]
+    assert diversity.diversity_groups(items) == []
 
 
 def test_collision_groups_items_with_same_form():
-    items = [_item("a"), _item("b"), _item("c")]
-    frames = [_frames(255), _frames(255), _frames(0)]
-    assert diversity.diversity_groups(items, frames) == [["a", "b"]]
+    items = [_item("a", params={"form": "cookie"}),
+             _item("b", params={"form": "cookie"}),
+             _item("c", params={"form": "gem"})]
+    assert diversity.diversity_groups(items) == [["a", "b"]]
 
 
 def test_collision_reports_all_members():
-    items = [_item(x) for x in "abcde"]
-    frames = [_frames(255)] * 4 + [_frames(0)]
-    assert diversity.diversity_groups(items, frames) == [["a", "b", "c", "d"]]
+    items = [_item(x, params={"form": "cookie"}) for x in "abcde"]
+    assert diversity.diversity_groups(items) == [["a", "b", "c", "d", "e"]]
 
 
-def test_empty_frames_are_skipped():
-    items = [_item("a"), _item("b")]
-    frames = [[], _frames(255)]
-    assert diversity.diversity_groups(items, frames) == []
+def test_groups_keep_spec_order():
+    items = [_item("a", params={"form": "cookie"}),
+             _item("b", params={"form": "gem"}),
+             _item("c", params={"form": "cookie"}),
+             _item("d", params={"form": "gem"})]
+    assert diversity.diversity_groups(items) == [["a", "c"], ["b", "d"]]
 
 
-def test_distinct_forms_counts_renderable_items():
-    assert diversity.distinct_forms([_frames(1), _frames(2), []]) == 2
+def test_empty_items_have_no_groups():
+    assert diversity.diversity_groups([]) == []
+
+
+# ── distinct_forms ──────────────────────────────────────────────────────
+
+def test_distinct_forms_counts_different_params():
+    items = [_item("a", params={"form": "cookie"}),
+             _item("b", params={"form": "donut"}),
+             _item("c", params={"form": "cookie"})]
+    assert diversity.distinct_forms(items) == 2
+
+
+def test_distinct_forms_collapses_identical_items():
+    items = [_item(x, params={"form": "cookie"}) for x in "abcd"]
+    assert diversity.distinct_forms(items) == 1
 
 
 def test_distinct_forms_empty():
     assert diversity.distinct_forms([]) == 0
+
+
+def test_distinct_forms_matches_group_math():
+    """distinct = items - members absorbed by each collision group."""
+    items = [_item("a", params={"form": "cookie"}),
+             _item("b", params={"form": "cookie"}),
+             _item("c", params={"form": "gem"}),
+             _item("d", params={"form": "gem"}),
+             _item("e", params={"form": "gem"})]
+    groups = diversity.diversity_groups(items)
+    assert diversity.distinct_forms(items) == len(items) - sum(
+        len(m) - 1 for m in groups)
+    assert diversity.distinct_forms(items) == 2
 
 
 # ── CLI ─────────────────────────────────────────────────────────────────
@@ -121,22 +201,19 @@ def test_cli_reports_no_collisions(tmp_path):
         {"id": "hero", "generator": "blob_walk", "frames": 8},
         {"id": "tiles", "generator": "terrain", "frames": 8},
     ])
-    r = runner.invoke(app,
-                      ["diversity", spec])
+    r = runner.invoke(app, ["diversity", spec])
     assert r.exit_code == 0
     assert "no collisions" in r.output
 
 
 def test_cli_reports_collisions_and_fails(tmp_path):
-    """Two props items with the same form+seed-slot render identically."""
     spec = _write_spec(tmp_path, [
         {"id": "cookie", "generator": "props", "frames": 1,
          "params": {"kind": "sweet", "form": "cookie"}},
         {"id": "coin", "generator": "props", "frames": 1,
          "params": {"kind": "sweet", "form": "cookie"}},
     ])
-    r = runner.invoke(app,
-                      ["diversity", spec])
+    r = runner.invoke(app, ["diversity", spec])
     assert r.exit_code == 1
     assert "collision" in r.output
     assert "cookie" in r.output and "coin" in r.output
@@ -149,8 +226,7 @@ def test_cli_no_fail_flag_exits_zero(tmp_path):
         {"id": "coin", "generator": "props", "frames": 1,
          "params": {"kind": "sweet", "form": "cookie"}},
     ])
-    r = runner.invoke(app,
-                      ["diversity", spec, "--no-fail"])
+    r = runner.invoke(app, ["diversity", spec, "--no-fail"])
     assert r.exit_code == 0
 
 
@@ -158,20 +234,47 @@ def test_cli_json_output(tmp_path):
     spec = _write_spec(tmp_path, [
         {"id": "hero", "generator": "blob_walk", "frames": 8},
     ])
-    r = runner.invoke(app,
-                      ["diversity", spec, "--json"])
+    r = runner.invoke(app, ["diversity", spec, "--json"])
     assert r.exit_code == 0
     data = json.loads(r.output)
     assert data["items"] == 1
+    assert data["distinct_forms"] == 1
     assert data["collisions"] == []
+
+
+def test_cli_json_counts_collapsed_forms(tmp_path):
+    spec = _write_spec(tmp_path, [
+        {"id": "cookie", "generator": "props", "frames": 1,
+         "params": {"form": "cookie"}},
+        {"id": "coin", "generator": "props", "frames": 1,
+         "params": {"form": "cookie"}},
+    ])
+    r = runner.invoke(app, ["diversity", spec, "--json", "--no-fail"])
+    data = json.loads(r.output)
+    assert data["items"] == 2
+    assert data["distinct_forms"] == 1
+    assert data["collisions"] == [{"items": ["cookie", "coin"]}]
+
+
+def test_cli_same_form_different_palette_collides(tmp_path):
+    """Dropping colours makes repainted copies of one form collide."""
+    spec = _write_spec(tmp_path, [
+        {"id": "a", "generator": "props", "frames": 1,
+         "params": {"form": "gem", "palette": "earth"}},
+        {"id": "b", "generator": "props", "frames": 1,
+         "params": {"form": "gem", "palette": "ocean"}},
+    ])
+    r = runner.invoke(app, ["diversity", spec, "--no-fail"])
+    assert r.exit_code == 0
+    assert "1 distinct forms" in r.output
+    assert "a, b" in r.output
 
 
 def test_cli_invalid_spec_exits_one(tmp_path):
     p = tmp_path / "bad.json"
     p.write_text('{"name":"x","seed":1,"layout":{"cols":4},"items":['
                  '{"id":"a","generator":"nope","frames":1}]}')
-    r = runner.invoke(app,
-                      ["diversity", str(p)])
+    r = runner.invoke(app, ["diversity", str(p)])
     assert r.exit_code == 1
     assert "invalid" in r.output
 
@@ -183,6 +286,5 @@ def test_cli_lists_colliding_ids(tmp_path):
         {"id": "coin", "generator": "props", "frames": 1,
          "params": {"kind": "sweet", "form": "cookie"}},
     ])
-    r = runner.invoke(app,
-                      ["diversity", spec])
+    r = runner.invoke(app, ["diversity", spec])
     assert "cookie, coin" in r.output

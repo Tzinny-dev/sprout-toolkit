@@ -85,11 +85,13 @@ sprout lint --max-atlas-mb 8 specs/tint.json
 
 ### `sprout diversity <spec>`
 
-Form coverage: which items render to the same sprite. Renders every item
-and compares the alpha silhouette on a 16×16 grid; items differing by
-fewer than 12 of 256 cells are the same *form* — a coverage gap, since two
-species that look identical need a new form or different params. Exits 1
-on collision (CI gate); `--no-fail` reports without failing.
+Form coverage: which items share the same form params. Groups items by
+generator, frame count, autotile and every structural param — palettes,
+colour literals and the `tint` declaration are dropped first, so items
+differing only in colour count as one form recoloured. Two items that
+agree on all of it are a coverage gap, since the effective vocabulary is
+smaller than the catalog claims. Exits 1 on collision (CI gate);
+`--no-fail` reports without failing.
 
 ```bash
 sprout diversity specs/catalog.json

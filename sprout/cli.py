@@ -460,24 +460,24 @@ def diversity(
     as_json: bool = typer.Option(False, "--json", help="machine-readable output"),
     fail: bool = typer.Option(
         True, "--fail/--no-fail",
-        help="exit 1 when two items render the same form"),
+        help="exit 1 when two items share the same form"),
 ) -> None:
-    """Measure form coverage: which items render to the same sprite.
+    """Measure form coverage: which items share the same form params.
 
-    Renders every item and compares the alpha silhouette downsampled to a
-    16x16 grid. Items whose silhouettes differ by fewer than 12 of 256
-    cells are reported as the same form — a coverage gap, since two
-    species that look identical need a new form or different params.
+    Groups items by generator, frame count, autotile and structural
+    params, dropping palettes, colour literals and the tint declaration
+    first — items differing only in colour are one form recoloured. Two
+    items that agree on all of it are a coverage gap, since the effective
+    vocabulary is smaller than the catalog says.
     """
     try:
         s = load_spec(spec)
-        items_frames = render_items(s)
     except SpecError as e:
         typer.secho(f"invalid: {e}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
-    groups = diversity_mod.diversity_groups(s.items, items_frames)
-    distinct = diversity_mod.distinct_forms(items_frames)
+    groups = diversity_mod.diversity_groups(s.items)
+    distinct = diversity_mod.distinct_forms(s.items)
     total = len(s.items)
 
     if as_json:

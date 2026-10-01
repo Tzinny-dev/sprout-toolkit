@@ -9,13 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- **`sprout diversity <spec>`**: measure form coverage — which items render
-  to the same sprite. Renders every item and compares the alpha
-  silhouette downsampled to a 16×16 grid; items differing by fewer than
-  12 of 256 cells are reported as the same form. `--json` for machine
-  output, `--no-fail` to report without exiting non-zero (default exits
-  1 on collision, for CI). Generic: no generator knowledge, works for any
-  catalog. Tests: `test_diversity.py` (20).
+- **`sprout diversity <spec>`**: measure form coverage — which items share
+  the same form. Groups items by generator, frame count, autotile and
+  structural params, dropping palettes, colour literals and the `tint`
+  declaration, so items differing only in colour count as one form
+  recoloured. `--json` for machine output, `--no-fail` to report without
+  exiting non-zero (default exits 1 on collision, for CI). Generic: no
+  generator knowledge, works for any catalog. Tests: `test_diversity.py`
+  (34).
 - **Data-driven vocabularies**: `props` and `face` load their forms and
   colors from `assets/vocab/*.json` instead of hardcoding them, so a
   consumer can extend the toolkit's vocabulary without forking it.
