@@ -407,6 +407,51 @@
         "kind": "container",
         "form": "box"
       }
+    },
+    {
+      "id": "bag_small",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "container",
+        "form": "bag_small"
+      }
+    },
+    {
+      "id": "bag_pouch",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "container",
+        "form": "bag_pouch"
+      }
+    },
+    {
+      "id": "box_closed",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "container",
+        "form": "box_closed"
+      }
+    },
+    {
+      "id": "box_open",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "container",
+        "form": "box_open"
+      }
+    },
+    {
+      "id": "crate",
+      "generator": "props",
+      "frames": 1,
+      "params": {
+        "kind": "container",
+        "form": "crate"
+      }
     }
   ]
 }

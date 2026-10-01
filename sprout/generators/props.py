@@ -1035,6 +1035,103 @@ class Props(Generator):
                      cy - 0.54 * r], fill=p["accent"],
                     outline=acc_out, width=max(1, ow // 2))
 
+    # ── tool: container variants ──────────────────────────────────────
+    def _bag_small(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                   vs: int, p: dict, ow: int) -> None:
+        # small tied pouch: short body, cinched neck, floppy knot
+        d.ellipse([cx - 0.50 * r, cy + 0.02 * r, cx + 0.50 * r, cy + 0.92 * r],
+                  fill=p["fill"], outline=p["outline"], width=ow)
+        # cinched neck above the belly
+        d.polygon([(cx - 0.34 * r, cy + 0.10 * r), (cx - 0.20 * r, cy - 0.34 * r),
+                   (cx + 0.20 * r, cy - 0.34 * r), (cx + 0.34 * r, cy + 0.10 * r)],
+                  fill=p["fill"], outline=p["outline"], width=max(1, ow // 2))
+        # tie cord
+        _rrect(d, [cx - 0.28 * r, cy - 0.36 * r, cx + 0.28 * r, cy - 0.22 * r],
+               0.05 * r, fill=p["accent"],
+               outline=palettes.outline_color(p["accent"]), width=max(1, ow // 2))
+        # knot tails
+        for k in (-1, 1):
+            d.line([cx + k * 0.06 * r, cy - 0.30 * r, cx + k * 0.24 * r, cy - 0.54 * r],
+                   fill=p["accent"], width=max(2, int(r * 0.07)))
+        # belly highlight
+        d.ellipse([cx - 0.30 * r, cy + 0.24 * r, cx + 0.06 * r, cy + 0.56 * r],
+                  fill=_lighten(p["fill"], 0.30))
+
+    def _bag_pouch(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                   vs: int, p: dict, ow: int) -> None:
+        # teardrop coin pouch, pointed at the neck
+        body = [(cx, cy - 0.62 * r), (cx + 0.62 * r, cy + 0.10 * r),
+                (cx + 0.34 * r, cy + 0.74 * r), (cx - 0.34 * r, cy + 0.74 * r),
+                (cx - 0.62 * r, cy + 0.10 * r)]
+        d.polygon(body, fill=p["fill"], outline=p["outline"], width=ow)
+        # drawstring collar
+        _rrect(d, [cx - 0.26 * r, cy - 0.60 * r, cx + 0.26 * r, cy - 0.44 * r],
+               0.06 * r, fill=p["accent"],
+               outline=palettes.outline_color(p["accent"]), width=max(1, ow // 2))
+        # coin bulge showing through
+        br = 0.20 * r
+        d.ellipse([cx - br, cy - 0.02 * r, cx + br, cy - 0.02 * r + 2 * br],
+                  fill=_lighten(p["accent"], 0.15))
+        d.ellipse([cx - br, cy - 0.02 * r, cx + br, cy - 0.02 * r + 2 * br],
+                  outline=palettes.darken(p["accent"], 0.7), width=max(1, ow // 2))
+
+    def _box_closed(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                    vs: int, p: dict, ow: int) -> None:
+        # shut crate-style box: lid flush with the body
+        body = [cx - 0.66 * r, cy - 0.36 * r, cx + 0.66 * r, cy + 0.80 * r]
+        d.rectangle(body, fill=p["fill"], outline=p["outline"], width=ow)
+        lid = [cx - 0.72 * r, cy - 0.62 * r, cx + 0.72 * r, cy - 0.30 * r]
+        d.rectangle(lid, fill=_lighten(p["fill"], 0.18), outline=p["outline"],
+                    width=ow)
+        # latch
+        acc_out = palettes.outline_color(p["accent"])
+        _rrect(d, [cx - 0.13 * r, cy - 0.36 * r, cx + 0.13 * r, cy - 0.18 * r],
+               0.04 * r, fill=p["accent"], outline=acc_out, width=max(1, ow // 2))
+        # corner braces
+        for k in (-1, 1):
+            d.line([cx + k * 0.58 * r, cy - 0.24 * r, cx + k * 0.58 * r, cy + 0.74 * r],
+                   fill=palettes.darken(p["fill"], 0.74), width=max(1, ow // 2))
+
+    def _box_open(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+                  vs: int, p: dict, ow: int) -> None:
+        # open box: rim + visible interior + lid leaning behind
+        lid = [cx - 0.62 * r, cy - 0.94 * r, cx + 0.62 * r, cy - 0.52 * r]
+        d.rectangle(lid, fill=_lighten(p["fill"], 0.18), outline=p["outline"],
+                    width=max(1, ow // 2))
+        body = [cx - 0.70 * r, cy - 0.34 * r, cx + 0.70 * r, cy + 0.84 * r]
+        d.rectangle(body, fill=p["fill"], outline=p["outline"], width=ow)
+        # hollow interior (dark), then a hint of contents
+        d.rectangle([cx - 0.56 * r, cy - 0.24 * r, cx + 0.56 * r, cy + 0.70 * r],
+                    fill=palettes.darken(p["fill"], 0.58))
+        d.rectangle([cx - 0.40 * r, cy - 0.14 * r, cx + 0.18 * r, cy + 0.30 * r],
+                    fill=p["accent"], outline=palettes.outline_color(p["accent"]),
+                    width=max(1, int(1.5)))
+        # rim highlight
+        d.line([cx - 0.70 * r, cy - 0.34 * r, cx + 0.70 * r, cy - 0.34 * r],
+               fill=_lighten(p["fill"], 0.42), width=max(1, ow))
+
+    def _crate(self, d: ImageDraw.ImageDraw, cx: float, cy: float, r: float,
+               vs: int, p: dict, ow: int) -> None:
+        # slatted wooden crate: frame plus plank slats and diagonal brace
+        outer = [cx - 0.78 * r, cy - 0.66 * r, cx + 0.78 * r, cy + 0.78 * r]
+        d.rectangle(outer, fill=p["fill"], outline=p["outline"], width=ow)
+        dark = palettes.darken(p["fill"], 0.70)
+        # horizontal slats with gaps
+        for k in range(3):
+            y0 = cy - 0.52 * r + k * 0.46 * r
+            d.rectangle([cx - 0.68 * r, y0, cx + 0.68 * r, y0 + 0.30 * r],
+                        fill=palettes.darken(p["fill"], 0.86))
+            d.line([cx - 0.68 * r, y0, cx + 0.68 * r, y0], fill=dark,
+                   width=max(1, ow // 2))
+        # vertical corner posts
+        for k in (-1, 1):
+            px0, px1 = sorted((cx + k * 0.60 * r, cx + k * 0.76 * r))
+            d.rectangle([px0, cy - 0.66 * r, px1, cy + 0.78 * r], fill=dark)
+        # diagonal brace
+        d.line([cx - 0.52 * r, cy + 0.62 * r, cx + 0.52 * r, cy - 0.50 * r],
+               fill=p["accent"], width=max(2, int(0.11 * r)))
+        d.rectangle(outer, outline=p["outline"], width=ow)
+
 
     def generate(
         self,
