@@ -28,7 +28,7 @@ documents the contract of the two machine-readable ones.
   "tiles": { "ids": [] },
   "meta": {
     "provenance": { "spec": "starter.json", "git": "", "supersample": 4 },
-    "generator": { "name": "sprout", "version": "0.3.0" }
+    "generator": { "name": "sprout", "version": "0.4.0" }
   }
 }
 ```

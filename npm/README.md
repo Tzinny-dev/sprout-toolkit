@@ -9,7 +9,7 @@ version must equal the installed CLI's version.
 
 - Node 18+
 - Python 3.10+ available as `python3` (or set `SPROUT_PYTHON`)
-- The pinned CLI: `python3 -m pip install "sprout-toolkit==0.3.0"`
+- The pinned CLI: `python3 -m pip install "sprout-toolkit==0.4.0"`
 
 ## Usage
 
