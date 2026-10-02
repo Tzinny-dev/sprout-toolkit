@@ -5,6 +5,7 @@ All notable changes to `sprout-toolkit` are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+
 ## [Unreleased]
 
 ### Added
@@ -50,9 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   directory. The other 12 were overwritten and nothing said so. Each spec now
   lands in `<out>/<spec name>/`, and two specs sharing a `name` are refused up
   front (exit 1, nothing written) instead of colliding. Without `--out` each
-  atlas still goes next to its own spec, where there was never a conflict. This
-  changes the `--out` layout, so scripts that read `<out>/atlas.png` need
-  `<out>/<spec name>/atlas.png`.
+  atlas still goes next to its own spec, where there was never a conflict.
+  **Breaking**: this changes the `--out` layout, so scripts that read
+  `<out>/atlas.png` need `<out>/<spec name>/atlas.png`. A setup that pointed at
+  two differently-named atlases in one shared directory now gets one
+  subdirectory per spec. `generate --out` is unaffected: it still writes a
+  single flat directory, so the single-atlas case never moved.
 - **`meta.provenance.supersample`** in the manifest: the factor actually used,
   including when `--supersample` overrode the spec. Recording it in `provenance`
   and not `units` because `units` is the contract for drawing the atlas and this
@@ -114,6 +118,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   installing a plug-in can never change the output of an existing spec.
   `sprout info` lists the active plug-in ids; `BUILTIN_GENERATORS` and
   `plugin_generator_ids()` expose the split. Tests: `test_plugins.py` (21).
+
+### Breaking changes
+
+- **`batch --out` layout is now one directory per spec** (`<out>/<spec name>/`).
+  See the entry above: the old flat layout silently discarded every atlas but
+  the last, which is a worse failure than the migration this asks for.
+  Consumers using `batch --out` with a shared directory need to update their
+  read paths; `generate --out` is unaffected.
 
 ## [0.3.0] — 2026-09-27
 
