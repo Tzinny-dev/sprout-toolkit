@@ -75,7 +75,7 @@ def test_watch_regenerates_on_spec_change(tmp_path: Path) -> None:
     spec = spec_dir / "p.json"
     spec.write_text((SPECS / "props.json").read_text())
     out = tmp_path / "out"
-    atlas = out / "atlas.png"
+    atlas = out / "props_atlas" / "atlas.png"
 
     proc = subprocess.Popen(
         [sys.executable, "-m", "sprout.cli", "watch", str(spec_dir),
@@ -101,6 +101,43 @@ def test_watch_regenerates_on_spec_change(tmp_path: Path) -> None:
             proc.kill()
 
 
+def test_watch_out_keeps_every_spec(tmp_path: Path) -> None:
+    """watch shares --out, so it had the same silent-overwrite bug as batch.
+
+    All 13 bundled specs call their atlas atlas.png; writing them into one
+    --out left a single atlas holding whichever spec ran last. Each spec must
+    land in its own subdirectory, named after the spec's `name`.
+    """
+    spec_dir = tmp_path / "specs"
+    spec_dir.mkdir()
+    for n in ("critter", "face"):
+        raw = json.loads((SPECS / f"{n}.json").read_text())
+        raw["layout"]["supersample"] = 1  # keep the watchdog test quick
+        (spec_dir / f"{n}.json").write_text(json.dumps(raw))
+    out = tmp_path / "out"
+
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "sprout.cli", "watch", str(spec_dir),
+         "--out", str(out), "--interval", "0.2"],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+    )
+    try:
+        _wait(lambda: (out / "critter_atlas" / "atlas.png").is_file()
+                      and (out / "face_atlas" / "atlas.png").is_file(),
+              20, "both specs generated into separate subdirectories")
+        # the bug: a flat layout would leave exactly one atlas.png
+        assert not (out / "atlas.png").exists()
+        a = _crc(out / "critter_atlas" / "atlas.png")
+        b = _crc(out / "face_atlas" / "atlas.png")
+        assert a and b and a != b, "each subdirectory must hold its own atlas"
+    finally:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
+
 def test_watch_skips_unchanged_spec(tmp_path: Path) -> None:
     """Touching the spec without changing its content -> skip (identical crc)."""
     spec_dir = tmp_path / "specs"
@@ -108,7 +145,7 @@ def test_watch_skips_unchanged_spec(tmp_path: Path) -> None:
     spec = spec_dir / "p.json"
     spec.write_text((SPECS / "props.json").read_text())
     out = tmp_path / "out"
-    atlas = out / "atlas.png"
+    atlas = out / "props_atlas" / "atlas.png"
 
     proc = subprocess.Popen(
         [sys.executable, "-m", "sprout.cli", "watch", str(spec_dir),

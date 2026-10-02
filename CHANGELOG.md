@@ -126,6 +126,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   the last, which is a worse failure than the migration this asks for.
   Consumers using `batch --out` with a shared directory need to update their
   read paths; `generate --out` is unaffected.
+- **`watch --out` has the same layout now**: it shared the flat `--out` with
+  every spec and had the identical silent-overwrite bug, so fixing only `batch`
+  would have left the same data loss one command away. Same subdirectory rule
+  and same refusal for duplicate names — except a bad spec is skipped with an
+  error instead of stopping the watcher, since a watcher that exits on one
+  malformed file is not much of a watcher.
 
 ## [0.3.0] — 2026-09-27
 

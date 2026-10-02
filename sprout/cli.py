@@ -774,11 +774,32 @@ def watch(
         typer.secho(f"no specs (*.json) found in {specs_dir}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
+    dest_root = f"{out}/<spec name>/" if out is not None else str(specs_dir)
     typer.secho(
-        f"[watch] {specs_dir} -> {out or specs_dir} every {interval}s "
+        f"[watch] {specs_dir} -> {dest_root} every {interval}s "
         f"({len(files)} specs) — Ctrl-C to exit",
         fg=typer.colors.CYAN,
     )
+    # Same rule as batch: one directory per spec, because every bundled spec
+    # calls its atlas atlas.png and a shared --out would keep only the last.
+    names: dict[str, Path] = {}
+    watched: dict[Path, str] = {}
+    for f in sorted(specs_dir.glob("*.json")):
+        try:
+            name = load_spec(f).name
+        except SpecError as e:
+            typer.secho(f"  [error] {f.name}: {e}", fg=typer.colors.RED, err=True)
+            continue
+        if name in names:
+            typer.secho(
+                f"  [error] {f.name}: shares the name '{name}' with "
+                f"{names[name].name}, so both would write to the same "
+                f"subdirectory — skipping {f.name}",
+                fg=typer.colors.RED, err=True,
+            )
+        else:
+            names[name] = f
+            watched[f] = name
     mtimes: dict[Path, float] = {}
     first = True
     try:
@@ -793,8 +814,11 @@ def watch(
                 mtimes[f] = mt
                 if not first:
                     typer.secho(f"  [changed] {f.name}", fg=typer.colors.BLUE)
+                if f not in watched:
+                    continue  # unreadable, or its name is already taken
                 try:
-                    r = _generate(f, out, None, True)
+                    dest = out / watched[f] if out is not None else None
+                    r = _generate(f, dest, None, True)
                 except SpecError as e:
                     typer.secho(f"  [error] {f.name}: {e}", fg=typer.colors.RED, err=True)
                     continue
