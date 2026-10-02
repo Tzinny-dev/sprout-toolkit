@@ -303,6 +303,53 @@ def test_batch_out_nests_per_spec_instead_of_overwriting(tmp_path: Path) -> None
             (out / name / "manifest.json").read_text())["name"] == name
 
 
+def test_batch_flat_restores_the_old_shared_directory(tmp_path: Path) -> None:
+    """--flat exists so the nested default cannot break existing setups.
+
+    Before nesting, a project with two specs whose atlases had different names
+    could point --out at one directory and read out/a.png and out/b.png. The
+    nested default moved those to out/a/a.png, which is a breaking change for
+    that setup; --flat restores it verbatim.
+    """
+    # distinct atlas names, which is what made the old shared directory work
+    src = _batch_specs(tmp_path, [("a", "a"), ("b", "b")], "a.png")
+    (src / "b.json").write_text(
+        (src / "b.json").read_text().replace('"a.png"', '"b.png"'))
+    out = tmp_path / "flat"
+    r = runner.invoke(app, ["batch", str(src), "-o", str(out), "--flat"])
+    assert r.exit_code == 0, r.output
+    for n in ("a", "b"):
+        assert (out / f"{n}.png").is_file(), f"expected the flat {n}.png"
+        assert not (out / n).exists(), "flat mode must not create subdirectories"
+        assert (out / "manifest.json").is_file()
+
+
+def test_batch_flat_refuses_a_shared_atlas_filename(tmp_path: Path) -> None:
+    """--flat is only safe while the atlas filenames differ.
+
+    Both specs below default to files.atlas atlas.png, so the flat layout
+    would keep one and discard the other. That is the original silent data
+    loss, and opting into --flat must not bring it back.
+    """
+    src = _batch_specs(tmp_path, [("x", "x"), ("y", "y")])  # both atlas.png
+    out = tmp_path / "flat"
+    r = runner.invoke(app, ["batch", str(src), "-o", str(out), "--flat"])
+    assert r.exit_code == 1
+    assert "share an atlas filename" in r.output
+    assert not out.exists() or not list(out.rglob("*.png")), "wrote nothing"
+
+
+def test_batch_flat_is_keyed_on_the_atlas_not_the_spec_name(tmp_path: Path) -> None:
+    """Two specs may share a name in flat mode: names do not decide paths there."""
+    src = _batch_specs(tmp_path, [("a", "same"), ("b", "other")], "left.png")
+    (src / "b.json").write_text(
+        (src / "b.json").read_text().replace('"left.png"', '"right.png"'))
+    out = tmp_path / "flat"
+    r = runner.invoke(app, ["batch", str(src), "-o", str(out), "--flat"])
+    assert r.exit_code == 0, r.output
+    assert (out / "left.png").is_file() and (out / "right.png").is_file()
+
+
 def test_batch_out_refuses_duplicate_spec_names(tmp_path: Path) -> None:
     """Nesting can still collide, so it must fail before writing anything."""
     src = _batch_specs(tmp_path, [("a", "same"), ("b", "same")])

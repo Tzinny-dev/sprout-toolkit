@@ -34,8 +34,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   recommendation. Tests: `test_supersample.py` (12).
 - **`layout.supersample`**: the same setting as a spec field, so the smoothing
   decision travels with the spec instead of depending on whoever runs the
-  command remembering a number. The 13 bundled specs and the `sprout init`
-  template now ask for 4. `--supersample` becomes an *override* of the field
+  command remembering a number. Twelve of the 13 bundled specs and the
+  `sprout init` template now ask for 4. Measured across all 13, that is the
+  right call for twelve of them — at N=4 `critter` antialiases 11,872 pixels
+  and `objects` 5,458, against zero for every one of them at N=1. `runtime`
+  keeps the default 1: it is value-noise FBM blended across a palette, so it
+  has no geometric edge to antialias, and BOX-filtering it leaves the
+  high-frequency content untouched (9 hard transitions across the top row
+  become 10, not fewer) while only shifting intermediate colours by a unit or
+  two. It was the one spec where 16x the render work bought nothing. `--supersample` becomes an *override* of the field
   rather than a default, so `sprout generate specs/critter.json` produces the
   smoothed atlas and `--supersample 1` still produces the old aliased bytes --
   verified: all 13 specs are byte-identical to their pre-flag output with
@@ -124,14 +131,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **`batch --out` layout is now one directory per spec** (`<out>/<spec name>/`).
   See the entry above: the old flat layout silently discarded every atlas but
   the last, which is a worse failure than the migration this asks for.
-  Consumers using `batch --out` with a shared directory need to update their
-  read paths; `generate --out` is unaffected.
+  **Pass `--flat` for the old behaviour** — a setup whose specs have distinct
+  atlas filenames keeps working unchanged, since `--flat` refuses exactly the
+  case that used to lose data (two specs writing the same atlas filename).
+  `generate --out` is unaffected; it never nested and still writes one flat
+  directory.
 - **`watch --out` has the same layout now**: it shared the flat `--out` with
   every spec and had the identical silent-overwrite bug, so fixing only `batch`
-  would have left the same data loss one command away. Same subdirectory rule
-  and same refusal for duplicate names — except a bad spec is skipped with an
-  error instead of stopping the watcher, since a watcher that exits on one
-  malformed file is not much of a watcher.
+  would have left the same data loss one command away. Same subdirectory rule,
+  same `--flat` escape hatch, and same refusal for duplicate keys — except a bad
+  spec is skipped with an error instead of stopping the watcher, since a
+  watcher that exits on one malformed file is not much of a watcher.
 
 ## [0.3.0] — 2026-09-27
 

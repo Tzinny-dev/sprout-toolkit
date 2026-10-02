@@ -287,6 +287,7 @@ def batch(
     mipmap_levels: int = typer.Option(3, "--mipmap-levels", help="maximum number of mip levels (with --mipmaps)"),
     silhouette: bool = typer.Option(False, "--silhouette", help="also emit silhouette.png (black x alpha) + SILHOUETTE_SOURCE"),
     supersample: int = typer.Option(None, "--supersample", help="override every spec's layout.supersample (1..8)"),
+    flat: bool = typer.Option(False, "--flat", help="write every file straight into --out instead of one directory per spec (needs distinct files.atlas)"),
 ) -> None:
     """Generate every spec in a directory (*.json pattern)."""
     if png_mode not in PNG_MODES:
@@ -310,26 +311,41 @@ def batch(
             typer.secho(f"error in {f}: {e}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1)
     if out is not None:
+        # What collides depends on the layout: nesting keys on the spec name,
+        # the flat layout keys on the atlas filename it actually writes.
+        spec_of = dict(named)
+        keys: list[tuple[Path, str, str]]
+        if flat:
+            keys = [(f, load_spec(f).filename, n) for f, n in named]
+        else:
+            keys = [(f, n, n) for f, n in named]
         seen: dict[str, Path] = {}
         clashing: list[str] = []
-        for f, name in named:
-            if name in seen:
-                clashing.append(f"{name} ({seen[name].name} and {f.name})")
+        for f, key, name in keys:
+            if key in seen:
+                clashing.append(f"{key} ({seen[key].name} and {f.name})")
             else:
-                seen[name] = f
+                seen[key] = f
         if clashing:
-            typer.secho(
-                "--out needs one directory per spec, but these specs share a "
-                "name and would land in the same subdirectory: "
-                + "; ".join(clashing) + " — rename one, or drop --out to write "
-                "each atlas next to its spec",
-                fg=typer.colors.RED, err=True,
-            )
+            what = ("--flat writes every file straight into --out, but these "
+                    "specs share an atlas filename"
+                    if flat else
+                    "--out needs one directory per spec, but these specs "
+                    "share a name and would land in the same subdirectory")
+            typer.secho(f"{what}: " + "; ".join(clashing) + " — "
+                        + ("drop --flat" if flat else "drop --flat, or rename one, "
+                           "or drop --out to write each atlas next to its spec"),
+                        fg=typer.colors.RED, err=True)
             raise typer.Exit(1)
+        if flat:
+            typer.secho(f"[batch] --flat: writing every file into {out}; "
+                        "two specs sharing an atlas filename would overwrite "
+                        "each other, so that case is refused above",
+                        fg=typer.colors.YELLOW)
 
     failed = 0
     for f, name in named:
-        dest = out / name if out is not None else out
+        dest = None if out is None else (out if flat else out / name)
         try:
             _generate(f, dest, None, skip_existing, png_mode, texturepacker,
                       mipmaps, mipmap_levels, silhouette=silhouette,
@@ -338,7 +354,8 @@ def batch(
             typer.secho(f"error in {f}: {e}", fg=typer.colors.RED, err=True)
             failed += 1
     typer.echo(f"[batch] {len(files) - failed}/{len(files)} specs ok"
-               + (f" -> {out}/<spec name>/" if out is not None else ""))
+               + (f" -> {out}/ (flat)" if (out is not None and flat)
+                  else f" -> {out}/<spec name>/" if out is not None else ""))
     if failed:
         raise typer.Exit(1)
 
@@ -764,6 +781,7 @@ def watch(
     specs_dir: Path = typer.Argument(..., help="directory with specs (*.json)"),
     out: Path = typer.Option(None, "--out", "-o", help="output directory (default: next to each spec)"),
     interval: float = typer.Option(1.0, "--interval", "-i", help="change-polling interval in seconds"),
+    flat: bool = typer.Option(False, "--flat", help="write every file straight into --out instead of one directory per spec (needs distinct files.atlas)"),
 ) -> None:
     """Watch specs/ and regenerate assets when they change (Ctrl-C to stop)."""
     if not specs_dir.is_dir():
@@ -774,7 +792,8 @@ def watch(
         typer.secho(f"no specs (*.json) found in {specs_dir}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
-    dest_root = f"{out}/<spec name>/" if out is not None else str(specs_dir)
+    dest_root = f"{out}/" if (out is not None and flat) else (
+        f"{out}/<spec name>/" if out is not None else str(specs_dir))
     typer.secho(
         f"[watch] {specs_dir} -> {dest_root} every {interval}s "
         f"({len(files)} specs) — Ctrl-C to exit",
@@ -790,15 +809,19 @@ def watch(
         except SpecError as e:
             typer.secho(f"  [error] {f.name}: {e}", fg=typer.colors.RED, err=True)
             continue
-        if name in names:
+        # In flat mode the collision key is the atlas filename actually written,
+        # not the spec name; in nested mode it is the spec name.
+        key = load_spec(f).filename if flat else name
+        if key in names:
             typer.secho(
-                f"  [error] {f.name}: shares the name '{name}' with "
-                f"{names[name].name}, so both would write to the same "
-                f"subdirectory — skipping {f.name}",
+                f"  [error] {f.name}: shares the "
+                + ("atlas filename" if flat else "name")
+                + f" '{key}' with {names[key].name}, so both would write to the "
+                f"same {'file' if flat else 'subdirectory'} — skipping {f.name}",
                 fg=typer.colors.RED, err=True,
             )
         else:
-            names[name] = f
+            names[key] = f
             watched[f] = name
     mtimes: dict[Path, float] = {}
     first = True
@@ -817,7 +840,8 @@ def watch(
                 if f not in watched:
                     continue  # unreadable, or its name is already taken
                 try:
-                    dest = out / watched[f] if out is not None else None
+                    dest = None if out is None else (
+                        out if flat else out / watched[f])
                     r = _generate(f, dest, None, True)
                 except SpecError as e:
                     typer.secho(f"  [error] {f.name}: {e}", fg=typer.colors.RED, err=True)

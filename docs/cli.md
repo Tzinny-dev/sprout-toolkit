@@ -86,6 +86,21 @@ directory would leave a single atlas holding whichever spec ran last. If two
 specs in the directory share a `name`, `batch` refuses and writes nothing
 rather than letting them collide in the same subdirectory.
 
+`--flat` restores the older shared-directory layout, for setups that already
+depend on it:
+
+```bash
+sprout batch specs/ --out ./out --flat    # -> ./out/atlas.png, ./out/manifest.json
+```
+
+In flat mode the collision key is the atlas filename rather than the spec name,
+so `batch` refuses two specs that would write the same file — the nesting
+default refuses shared *names*, `--flat` refuses shared *filenames*. Neither
+mode silently overwrites an atlas.
+
+`watch --out` takes the same `--flat`, so the two commands cannot disagree about
+where a file lands.
+
 ### `sprout watch <dir>`
 
 Regenerates when files under a directory change (Ctrl-C to exit). Writes are
