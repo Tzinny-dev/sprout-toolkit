@@ -30,9 +30,13 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Tzinny-dev/sprout-toolkit"
+Homepage = "https://sprout-toolkit.tzinny.com/"
+Documentation = "https://sprout-toolkit.tzinny.com/docs"
 Repository = "https://github.com/Tzinny-dev/sprout-toolkit"
 Issues = "https://github.com/Tzinny-dev/sprout-toolkit/issues"
+Changelog = "https://github.com/Tzinny-dev/sprout-toolkit/blob/main/CHANGELOG.md"
+Funding = "https://paypal.me/carlostzin"
+"Buy me a coffee" = "https://www.buymeacoffee.com/tzinny"
 
 [project.optional-dependencies]
 test = ["pytest>=8"]

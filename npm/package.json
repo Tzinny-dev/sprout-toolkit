@@ -21,7 +21,11 @@
   "bugs": {
     "url": "https://github.com/Tzinny-dev/sprout-toolkit/issues"
   },
-  "homepage": "https://github.com/Tzinny-dev/sprout-toolkit#readme",
+  "homepage": "https://sprout-toolkit.tzinny.com/",
+  "funding": {
+    "paypal": "https://paypal.me/carlostzin",
+    "buymeacoffee": "https://www.buymeacoffee.com/tzinny"
+  },
   "keywords": [
     "procgen",
     "sprites",
