@@ -50,10 +50,19 @@ every record's `x`/`y`/`w`/`h` stay put, and anchors and font advances are
 divided back down. `supersample: 1` reproduces pre-supersampling output byte
 for byte, so the field is safe to add to an existing spec.
 
-`4` is the useful value; the shipped specs use it. The cost is PNG size (the
-13 bundled specs go from 216 KB to 416 KB) and render time, since 4× means 16×
-the pixels to draw — transient memory, not a bigger atlas. `sprout generate
---supersample N` overrides the field.
+`4` is the useful value; twelve of the thirteen shipped specs use it. The cost
+is PNG size (the 13 bundled specs go from 216 KB to 416 KB) and render time,
+since 4× means 16× the pixels to draw — transient memory, not a bigger atlas.
+`sprout generate --supersample N` overrides the field.
+
+`runtime.json` is the exception and stays at the `1` default. Its generator
+(`terrain`) is value-noise FBM blended across a palette, so it has no geometric
+edge to antialias: at `N=4` it produces zero partially-transparent pixels,
+exactly like `N=1`, and the box filter leaves the high-frequency content alone
+(9 hard transitions along the top row become 10, not fewer) while only shifting
+intermediate colours by a unit or two. Worth knowing if you write your own
+noise-based generator — the measurement to run is "did `N=4` antialias any edge?",
+not "is it cheap to avoid?".
 
 ## Items
 

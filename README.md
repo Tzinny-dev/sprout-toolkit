@@ -138,7 +138,7 @@ The installed command is `sprout` (not `sprout-toolkit` — that's just the PyPI
 
 ```bash
 npm install --save-dev sprout-toolkit
-python3 -m pip install "sprout-toolkit==0.3.0"   # pinned CLI for the wrapper
+python3 -m pip install "sprout-toolkit==0.4.0"   # pinned CLI for the wrapper
 npx sprout --version
 ```
 
@@ -159,6 +159,7 @@ sprout init --out ./assets/starter
 
 # Generate every asset defined under specs/
 sprout batch specs/ --out ./out        # ./out/<spec name>/ per atlas — see below
+sprout batch specs/ --out ./out --flat # old shared-directory layout (see Migrating)
 
 # Generate a specific spec
 sprout generate specs/demo.json --out ./out
@@ -260,6 +261,41 @@ Example spec using `props`:
   ]
 }
 ```
+
+## Migrating to 0.4.0
+
+One breaking change, and it is the layout of `batch --out`.
+
+**`batch --out` now writes one directory per spec**, at `<out>/<spec name>/`.
+
+Before 0.4.0 every spec wrote into the shared `--out` under its own
+`files.atlas` name. All 13 bundled specs call that `atlas.png`, so a single
+`--out` left **one** atlas holding whichever spec ran last while the command
+still reported `13/13 specs ok`. The nesting is what makes a shared `--out`
+lossless.
+
+If your read paths break, you have two options:
+
+```bash
+# 1. update the paths (recommended)
+#   before: out/atlas.png          after: out/my_spec_atlas/atlas.png
+
+# 2. keep the old layout exactly
+sprout batch specs/ --out ./out --flat
+```
+
+`--flat` is the pre-0.4.0 layout, unchanged. It is safe to use while your
+atlas filenames differ, and `batch` refuses (exit 1, nothing written) if two
+specs would write the same file — so `--flat` cannot bring the silent data loss
+back. `watch --out` takes the same flag and the same rule.
+
+`generate --out` is **unchanged**: it never nested, so single-atlas setups
+should need no edits at all.
+
+Also new in 0.4.0, none of it breaking: `--supersample` and the
+`layout.supersample` spec field (antialiased curves, `supersample: 1` reproduces
+the old bytes), `sprout diversity`, third-party generators via entry points,
+data-driven vocabularies, and `meta.provenance.supersample` in the manifest.
 
 ## Development
 
