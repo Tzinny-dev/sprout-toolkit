@@ -33,16 +33,39 @@ export function Layout() {
         <Outlet />
       </main>
       <footer className="border-t border-slate-800 mt-16">
-        <div className="container mx-auto px-4 py-6 text-sm text-slate-500">
-          <span className="font-mono">pip install sprout-toolkit</span> · MIT licensed ·{' '}
-          <a
-            href="https://github.com/Tzinny-dev/sprout-toolkit"
-            className="underline hover:text-slate-300"
-            target="_blank"
-            rel="noreferrer"
-          >
-            GitHub
-          </a>
+        <div className="container mx-auto px-4 py-6 text-sm text-slate-500 space-y-2">
+          <p>
+            <span className="font-mono">pip install sprout-toolkit</span> · MIT licensed ·{' '}
+            <a
+              href="https://github.com/Tzinny-dev/sprout-toolkit"
+              className="underline hover:text-slate-300"
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub
+            </a>
+          </p>
+          <p>
+            Sprout is MIT and free to use. If it saved you time, you can{' '}
+            <a
+              href="https://paypal.me/carlostzin"
+              className="underline hover:text-slate-300"
+              target="_blank"
+              rel="noreferrer"
+            >
+              support it on PayPal
+            </a>{' '}
+            or{' '}
+            <a
+              href="https://www.buymeacoffee.com/tzinny"
+              className="underline hover:text-slate-300"
+              target="_blank"
+              rel="noreferrer"
+            >
+              buy me a coffee
+            </a>
+            .
+          </p>
         </div>
       </footer>
     </div>

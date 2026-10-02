@@ -16,10 +16,6 @@ It generates atlases, tilemaps, autotiles, bitmap fonts and SkSL shaders from JS
 
 ![Hero blob walk cycle](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/hero_walk.gif)
 ![Spark burst](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/spark.gif)
-![Critter roster](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/critter.png)
-![Flora roster](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/flora.png)
-![Face moods](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/face.png)
-![Object grammar](https://raw.githubusercontent.com/Tzinny-dev/sprout-toolkit/main/docs/showcase/objects.png)
 
 ---
 
