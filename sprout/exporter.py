@@ -59,10 +59,15 @@ def resolve_supersample(spec: Spec, override: int | None = None) -> int:
     The flag is an override so the smoothing decision can live in the spec --
     which is where the shipped specs keep it -- instead of depending on whoever
     invokes the command remembering a number.
+
+    The error names the flag when an override is at fault, because that is the
+    only way this can still fire: ``load_spec`` has already validated the field.
     """
+    if override is not None and not 1 <= override <= 8:
+        raise SpecError(f"invalid --supersample: {override} (1..8)")
     value = spec.layout.supersample if override is None else override
     if not 1 <= value <= 8:
-        raise SpecError(f"invalid supersample: {value} (1..8)")
+        raise SpecError(f"invalid layout.supersample: {value} (1..8)")
     return value
 
 
@@ -191,7 +196,8 @@ def build_manifest(spec: Spec, records: list[dict], atlas_name: str,
                    shader_block: dict | None = None, font_map: dict | None = None,
                    mipmaps_block: dict | None = None,
                    silhouette_name: str | None = None,
-                   tiers_block: dict | None = None) -> dict:
+                   tiers_block: dict | None = None,
+                   supersample: int = 1) -> dict:
     anim: dict[str, dict] = {}
     for name, a in spec.animations.items():
         item = next(it for it in spec.items if it.id == a.frames)
@@ -233,7 +239,11 @@ def build_manifest(spec: Spec, records: list[dict], atlas_name: str,
         "anim": anim,
         "tiles": {"ids": tile_ids},
         "meta": {
-            "provenance": {"spec": spec_path, "git": ""},
+            # supersample is recorded rather than left implicit: it changes the
+            # bytes, so someone regenerating and getting different bytes needs
+            # the manifest to say why. Not in `units`, which is the contract for
+            # drawing the atlas and is unaffected by it.
+            "provenance": {"spec": spec_path, "git": "", "supersample": supersample},
             "generator": {"name": "sprout", "version": __version__},
         },
         **({"autotile": autotile_map} if autotile_map else {}),
@@ -702,8 +712,14 @@ export interface GeneratorMeta {{
   name: string;
   version: string;
 }}
+export interface ManifestProvenance {{
+  spec: string;
+  git: string;
+  /** Rendered at framePx * this and box-filtered back down. 1 = no supersampling. */
+  supersample?: number;
+}}
 export interface ManifestMeta {{
-  provenance: {{ spec: string; git: string }};
+  provenance: ManifestProvenance;
   generator: GeneratorMeta;
 }}
 

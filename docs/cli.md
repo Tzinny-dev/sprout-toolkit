@@ -75,8 +75,16 @@ there to bound a squared factor, not because 8 is useful.
 Generates every `*.json` spec found under a directory.
 
 ```bash
-sprout batch specs/ --out ./out
+sprout batch specs/                 # each atlas next to its own spec
+sprout batch specs/ --out ./out     # ./out/<spec name>/{atlas.png,manifest.json,index.ts}
 ```
+
+With `--out` every spec gets its own subdirectory named after the spec's
+`name`, because they do not necessarily share an atlas filename: all 13
+bundled specs use `files.atlas: "atlas.png"`, so writing them into one shared
+directory would leave a single atlas holding whichever spec ran last. If two
+specs in the directory share a `name`, `batch` refuses and writes nothing
+rather than letting them collide in the same subdirectory.
 
 ### `sprout watch <dir>`
 

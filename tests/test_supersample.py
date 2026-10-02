@@ -237,19 +237,107 @@ def test_batch_exposes_supersample(tmp_path: Path) -> None:
     for n in ("critter", "face"):
         raw = json.loads((SPECS / f"{n}.json").read_text())
         raw["layout"]["supersample"] = 1
-        # batch -o writes every spec into one directory, so the atlas names have
-        # to differ or they overwrite each other.
         raw["files"]["atlas"] = f"{n}.png"
         (src / f"{n}.json").write_text(json.dumps(raw, indent=2) + "\n")
+    # the subdirectory is the spec's `name` (critter.json -> critter_atlas)
+    sub = "critter_atlas"
     ok = runner.invoke(app, ["batch", str(src), "-o", str(tmp_path / "plain")])
     assert ok.exit_code == 0, ok.output
     assert _partial_alpha(
-        Image.open(tmp_path / "plain" / "critter.png").convert("RGBA")) == 0
+        Image.open(tmp_path / "plain" / sub / "critter.png").convert("RGBA")) == 0
     ss = runner.invoke(app, ["batch", str(src), "-o", str(tmp_path / "ss"),
                              "--supersample", "4"])
     assert ss.exit_code == 0, ss.output
     assert _partial_alpha(
-        Image.open(tmp_path / "ss" / "critter.png").convert("RGBA")) > 1000
+        Image.open(tmp_path / "ss" / sub / "critter.png").convert("RGBA")) > 1000
+
+
+def test_supersample_is_recorded_as_provenance(tmp_path: Path) -> None:
+    """The factor actually used, so changed bytes can be explained later.
+
+    Provenance rather than `units`, because `units` is the contract for
+    drawing the atlas and supersampling does not change it.
+    """
+    _, m = _gen("critter", tmp_path)
+    assert m["meta"]["provenance"]["supersample"] == 4
+    assert "supersample" not in m["units"]
+    _, off = _gen("critter", tmp_path, "--supersample", "1")
+    assert off["meta"]["provenance"]["supersample"] == 1, "flag override not recorded"
+    _, eight = _gen("critter", tmp_path, "--supersample", "8")
+    assert eight["meta"]["provenance"]["supersample"] == 8
+
+
+# ── batch -o nests per spec instead of overwriting ────────────────────────────
+
+def _batch_specs(tmp_path: Path, specs: list[tuple[str, str]],
+                 atlas_name: str = "atlas.png") -> Path:
+    """Write spec files as (file stem, spec name) pairs.
+
+    They are separate on purpose: two files can share a spec `name`, and that
+    is exactly the collision `batch --out` has to refuse.
+    """
+    src = tmp_path / "bspecs"
+    src.mkdir(exist_ok=True)
+    for stem, name in specs:
+        raw = json.loads((SPECS / "critter.json").read_text())
+        raw["name"] = name
+        raw["files"]["atlas"] = atlas_name
+        (src / f"{stem}.json").write_text(json.dumps(raw, indent=2) + "\n")
+    return src
+
+
+def test_batch_out_nests_per_spec_instead_of_overwriting(tmp_path: Path) -> None:
+    """The bug that started this: every bundled spec writes `atlas.png`.
+
+    With a shared --out they all landed in the same directory, so a 13-spec
+    batch reported 13/13 ok and left one atlas holding only the last spec.
+    """
+    src = _batch_specs(tmp_path, [(n, n) for n in ("one", "two", "three")])
+    out = tmp_path / "bout"
+    result = runner.invoke(app, ["batch", str(src), "-o", str(out)])
+    assert result.exit_code == 0, result.output
+    atlases = sorted(p.relative_to(out).as_posix() for p in out.rglob("atlas.png"))
+    assert atlases == ["one/atlas.png", "three/atlas.png", "two/atlas.png"]
+    for name in ("one", "two", "three"):
+        assert json.loads(
+            (out / name / "manifest.json").read_text())["name"] == name
+
+
+def test_batch_out_refuses_duplicate_spec_names(tmp_path: Path) -> None:
+    """Nesting can still collide, so it must fail before writing anything."""
+    src = _batch_specs(tmp_path, [("a", "same"), ("b", "same")])
+    out = tmp_path / "clash"
+    result = runner.invoke(app, ["batch", str(src), "-o", str(out)])
+    assert result.exit_code == 1
+    assert "share a name" in result.output
+    assert not out.exists(), "nothing should be written when the batch is rejected"
+
+
+def test_batch_without_out_still_writes_beside_each_spec(tmp_path: Path) -> None:
+    """No --out means no shared directory, so nesting does not apply."""
+    src = _batch_specs(tmp_path, [("solo", "solo")])
+    result = runner.invoke(app, ["batch", str(src)])
+    assert result.exit_code == 0, result.output
+    assert (src / "atlas.png").is_file()
+    assert not (src / "solo").exists()
+
+
+def test_batch_nested_output_is_supersampled_from_the_spec(tmp_path: Path) -> None:
+    src = tmp_path / "ssspecs"
+    src.mkdir()
+    for n in ("a", "b"):
+        raw = json.loads((SPECS / "critter.json").read_text())
+        raw["name"] = n
+        raw["files"]["atlas"] = f"{n}.png"
+        (src / f"{n}.json").write_text(json.dumps(raw, indent=2) + "\n")
+    result = runner.invoke(app, ["batch", str(src), "-o", str(tmp_path / "ssout")])
+    assert result.exit_code == 0, result.output
+    for n in ("a", "b"):
+        img = Image.open(tmp_path / "ssout" / n / f"{n}.png").convert("RGBA")
+        assert _partial_alpha(img) > 1000, n
+        assert json.loads(
+            (tmp_path / "ssout" / n / "manifest.json").read_text()
+        )["meta"]["provenance"]["supersample"] == 4
 
 
 # ── validation ────────────────────────────────────────────────────────────────

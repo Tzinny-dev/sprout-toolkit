@@ -27,11 +27,17 @@ documents the contract of the two machine-readable ones.
   "anim": { "walk": { "frames": ["hero_00", "..."], "fps": 8, "loop": true } },
   "tiles": { "ids": [] },
   "meta": {
-    "provenance": { "spec": "starter.json", "git": "" },
+    "provenance": { "spec": "starter.json", "git": "", "supersample": 4 },
     "generator": { "name": "sprout", "version": "0.3.0" }
   }
 }
 ```
+
+- **`meta.provenance.supersample`** — the factor actually used to render the
+  atlas (`framePx × N` box-filtered back down). Provenance rather than `units`,
+  because `units` is the contract for drawing the atlas and supersampling does
+  not change it — but it does change the bytes, so regenerating and getting
+  something different is explainable from the manifest alone.
 
 - **`frames[]`** — `id` is `<item>_<index>` (`hero_00`, `hero_01`, …).
   `anchor` appears **only on `props` frames** (ground-contact point in local

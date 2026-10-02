@@ -44,6 +44,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   pixels to draw (transient memory, not a bigger atlas), and `sprout init`'s
   starter atlas changes, so its determinism pin moved. Tests:
   `test_supersample.py` (19).
+- **`batch --out` writes one directory per spec**: it reported `13/13 specs ok`
+  and left a *single* atlas, because all 13 bundled specs use
+  `files.atlas: "atlas.png"` and every one of them wrote into the shared
+  directory. The other 12 were overwritten and nothing said so. Each spec now
+  lands in `<out>/<spec name>/`, and two specs sharing a `name` are refused up
+  front (exit 1, nothing written) instead of colliding. Without `--out` each
+  atlas still goes next to its own spec, where there was never a conflict. This
+  changes the `--out` layout, so scripts that read `<out>/atlas.png` need
+  `<out>/<spec name>/atlas.png`.
+- **`meta.provenance.supersample`** in the manifest: the factor actually used,
+  including when `--supersample` overrode the spec. Recording it in `provenance`
+  and not `units` because `units` is the contract for drawing the atlas and this
+  does not change it -- but it does change the bytes, so a regenerated atlas
+  that differs is now explainable from the manifest alone. The emitted
+  `ManifestProvenance` type gained the field (optional, so the demo typechecks
+  against a manifest written before this). Tests: `test_supersample.py` (24).
 - **`sprout diversity <spec>`**: measure form coverage — which items share
   the same form. Groups items by generator, frame count, autotile and
   structural params, dropping palettes, colour literals and the `tint`

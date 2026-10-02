@@ -42,6 +42,7 @@ from .exporter import (
     emit_index_ts,
     emit_tier_index_ts,
     render_items,
+    resolve_supersample,
     shader_filename,
     texturepacker_filename,
     write_manifest,
@@ -73,9 +74,9 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
         if frame_px < 8 or frame_px > 4096:
             raise SpecError(f"invalid --frame-px: {frame_px} (8..4096)")
         spec.layout.frame_px = frame_px
-    # The flag is an override; absent means "use the spec's layout.supersample".
-    if supersample is not None and not 1 <= supersample <= 8:
-        raise SpecError(f"invalid --supersample: {supersample} (1..8)")
+    # Resolved once, here, so the manifest records the factor actually used and
+    # not merely the one the spec asks for. An override outranks the field.
+    supersample = resolve_supersample(spec, supersample)
 
     frames = render_items(spec, supersample)
     sheet, records = build_sheet(spec, frames, supersample)
@@ -103,7 +104,7 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
                               autotile_map, shader_block, font_map,
                               {"levels": mip_meta} if mip_meta else None,
                               "silhouette.png" if silhouette else None,
-                              tiers_block)
+                              tiers_block, supersample)
 
     if skip_existing and atlas_path.is_file() and manifest_path.is_file() and index_path.is_file():
         missing_extra = (
@@ -296,16 +297,48 @@ def batch(
     if not files:
         typer.secho(f"no specs (*.json) found in {specs_dir}", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
-    failed = 0
+
+    # With --out every spec used to write into that one directory under its own
+    # `files.atlas` name, which is `atlas.png` in every bundled spec: the batch
+    # reported 13/13 ok and left a single atlas holding the last spec. Each spec
+    # gets a subdirectory named after it, so a common --out is lossless.
+    named: list[tuple[Path, str]] = []
     for f in files:
         try:
-            _generate(f, out, None, skip_existing, png_mode, texturepacker,
+            named.append((f, load_spec(f).name))
+        except SpecError as e:
+            typer.secho(f"error in {f}: {e}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1)
+    if out is not None:
+        seen: dict[str, Path] = {}
+        clashing: list[str] = []
+        for f, name in named:
+            if name in seen:
+                clashing.append(f"{name} ({seen[name].name} and {f.name})")
+            else:
+                seen[name] = f
+        if clashing:
+            typer.secho(
+                "--out needs one directory per spec, but these specs share a "
+                "name and would land in the same subdirectory: "
+                + "; ".join(clashing) + " — rename one, or drop --out to write "
+                "each atlas next to its spec",
+                fg=typer.colors.RED, err=True,
+            )
+            raise typer.Exit(1)
+
+    failed = 0
+    for f, name in named:
+        dest = out / name if out is not None else out
+        try:
+            _generate(f, dest, None, skip_existing, png_mode, texturepacker,
                       mipmaps, mipmap_levels, silhouette=silhouette,
                       supersample=supersample)
         except SpecError as e:
             typer.secho(f"error in {f}: {e}", fg=typer.colors.RED, err=True)
             failed += 1
-    typer.echo(f"[batch] {len(files) - failed}/{len(files)} specs ok")
+    typer.echo(f"[batch] {len(files) - failed}/{len(files)} specs ok"
+               + (f" -> {out}/<spec name>/" if out is not None else ""))
     if failed:
         raise typer.Exit(1)
 

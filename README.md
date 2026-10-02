@@ -158,7 +158,7 @@ differs from the wrapper's own — both channels release in lockstep (see
 sprout init --out ./assets/starter
 
 # Generate every asset defined under specs/
-sprout batch specs/ --out ./out
+sprout batch specs/ --out ./out        # ./out/<spec name>/ per atlas — see below
 
 # Generate a specific spec
 sprout generate specs/demo.json --out ./out
