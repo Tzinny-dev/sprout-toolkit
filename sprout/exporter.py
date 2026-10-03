@@ -20,28 +20,51 @@ from .generators.font import resolve_font_path
 from .spec import Spec, SpecError
 
 
-def shader_filename(spec: Spec) -> str:
-    return f"{spec.name}.sksl"
+def sidecar_name(base: str, stem: str | None = None) -> str:
+    """Qualify a fixed-name sidecar with the owning spec, for the `--flat` layout.
+
+    Every spec in a flat directory shares one set of names, and the fixed ones
+    (`manifest.json`, `index.ts`, `silhouette.png`) collide as soon as a second
+    spec is generated there. Naming them after the atlas stem keeps one spec's
+    metadata from overwriting another's. Mipmaps are already keyed on
+    `spec.filename`, so they never needed this.
+    """
+    return f"{stem}.{base}" if stem else base
 
 
-def build_shader(spec: Spec) -> tuple[str, dict] | tuple[None, None]:
+def _owner(spec: Spec, stem: str | None) -> str:
+    """The prefix for name-derived sidecars: the atlas stem in `--flat`.
+
+    Nested mode keys them on `spec.name`, which is unique inside its own
+    directory. Flat mode has to key them on something unique across the shared
+    directory, and atlas filenames are exactly what `--flat` already guarantees
+    to be distinct.
+    """
+    return stem if stem else spec.name
+
+
+def shader_filename(spec: Spec, stem: str | None = None) -> str:
+    return f"{_owner(spec, stem)}.sksl"
+
+
+def build_shader(spec: Spec, stem: str | None = None) -> tuple[str, dict] | tuple[None, None]:
     """SkSL source + manifest `shader` block (or `(None, None)` if `runtime` is off)."""
     if spec.runtime is None:
         return None, None
     source = sksl.render_shader()
     uniforms = sksl.build_uniforms(spec.seed, spec.runtime, spec.layout.frame_px)
-    block = {"file": shader_filename(spec), "uniforms": uniforms}
+    block = {"file": shader_filename(spec, stem), "uniforms": uniforms}
     return source, block
 
 
-def build_tier_shaders(spec: Spec) -> dict[str, dict]:
+def build_tier_shaders(spec: Spec, stem: str | None = None) -> dict[str, dict]:
     """name -> {source, file, template, uniforms} for each spec `tiers` entry."""
     out: dict[str, dict] = {}
     for name, rule in (spec.tiers or {}).items():
         template = rule["template"]
         out[name] = {
             "source": sksl.render_tier_shader(template),
-            "file": sksl.tier_shader_filename(spec.name, name),
+            "file": sksl.tier_shader_filename(_owner(spec, stem), name),
             "template": template,
             "uniforms": sksl.tier_shader(spec.seed, template, rule["params"]),
         }
@@ -312,8 +335,8 @@ def blacken(sheet: Image.Image) -> Image.Image:
 _TP_FORMAT = {"rgba": "RGBA8888", "png24": "RGB888", "png8": "I8"}
 
 
-def texturepacker_filename(spec: Spec) -> str:
-    return f"{spec.name}.tpsheet.json"
+def texturepacker_filename(spec: Spec, stem: str | None = None) -> str:
+    return f"{_owner(spec, stem)}.tpsheet.json"
 
 
 def build_texturepacker(spec: Spec, records: list[dict], atlas_name: str,

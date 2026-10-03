@@ -1,6 +1,6 @@
 {
   "name": "sprout-toolkit",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Deterministic procedural 2D asset generation for Expo + react-native-skia — Python CLI wrapper",
   "bin": {
     "sprout": "bin/sprout.js"

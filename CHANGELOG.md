@@ -8,6 +8,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-10-03
+
+### Fixed
+
+- **`batch --flat` and `watch --flat` no longer lose every spec but the last.**
+  The collision guard checked `files.atlas` and nothing else, so a flat
+  directory holding several specs with distinct atlases passed the guard and
+  reported `N/N specs ok` — then left one `manifest.json` and one `index.ts`,
+  belonging to whichever spec ran last. That `index.ts` requires the last
+  spec's atlas, so the other specs' frames were unreachable, and their
+  manifests were simply gone. `silhouette.png` had the same problem by name,
+  and `<name>.tpsheet.json` / `<name>.sksl` collided whenever two specs shared
+  a name — which `--flat` allows on purpose. Mipmaps were already keyed on the
+  atlas filename, which is why they were never affected.
+
+  In flat mode each spec's other outputs now take the atlas stem as a prefix:
+
+  | before | now |
+  |---|---|
+  | `manifest.json` | `<atlas-stem>.manifest.json` |
+  | `index.ts` | `<atlas-stem>.index.ts` |
+  | `silhouette.png` | `<atlas-stem>.silhouette.png` |
+  | `<name>.tpsheet.json` | `<atlas-stem>.tpsheet.json` |
+  | `<name>.sksl` | `<atlas-stem>.sksl` |
+  | `atlas.png` | unchanged — still flat |
+  | `atlas@2x.png` | unchanged — already atlas-keyed |
+
+  **Migration:** only if you ran a `--flat` batch of more than one spec and read
+  `out/manifest.json` or `out/index.ts`. You were reading the last spec's file;
+  switch to the prefixed name for the spec you actually wanted. Consumers that
+  imported a single `index.ts` from a multi-spec flat directory were importing
+  one spec's frames out of several — there is no single correct replacement, so
+  pick the `<atlas-stem>.index.ts` you meant, or move to the nested default.
+  Single-spec `--flat` is unaffected apart from the sidecar names. `generate`
+  and nested output are untouched.
+
+- **`batch` no longer loads each spec twice**, and an unused local in the
+  collision check is gone.
+
+### Changed
+
+- **Corrected the 0.4.0 supersample size figures.** They were measured before
+  `runtime` was moved back to N=1, so they counted thirteen specs: the real
+  numbers for the twelve that ask for N=4 are 203 KB → 402 KB, not
+  216 KB → 416 KB.
+
+### Metadata
+
+- `Homepage` points at the documentation site instead of the repository, and
+  `Documentation`, `Changelog`, `Funding` and `Buy me a coffee` were added to
+  the project links. npm gets the site as `homepage` and the two donation links
+  in its native `funding` field. These only reach PyPI and npm with this
+  release, since a published version's metadata is frozen.
+
 ## [0.4.0] — 2026-10-01
 
 ### Added
@@ -31,8 +85,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   colour instead of averaging in the `(0, 0, 0, 0)` background — verified by
   filling transparent pixels red, green and white and getting the same
   result. N=4 is the useful setting (5.2% vs 3.4% at N=2 and 5.9% at N=8) for
-  16x the *transient* memory; the real cost is PNG size, 216 KB to 416 KB
-  across the 13 bundled specs. The 8x cap bounds a squared factor, not a
+  16x the *transient* memory; the real cost is PNG size, 203 KB to 402 KB
+  across the twelve specs that ask for it (`runtime` renders at N=1 — see
+  below). The 8x cap bounds a squared factor, not a
   recommendation. Tests: `test_supersample.py` (12).
 - **`layout.supersample`**: the same setting as a spec field, so the smoothing
   decision travels with the spec instead of depending on whoever runs the

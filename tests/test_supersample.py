@@ -303,6 +303,78 @@ def test_batch_out_nests_per_spec_instead_of_overwriting(tmp_path: Path) -> None
             (out / name / "manifest.json").read_text())["name"] == name
 
 
+def _flat_specs(tmp_path: Path, names: list[str], dir_name: str = "flatspecs",
+                supersample: int | None = None) -> Path:
+    """Write one spec per name, each with its own `<name>.png` atlas.
+
+    Written out directly instead of patching a shared atlas name afterwards:
+    in a flat directory the atlas filename is what has to be distinct.
+    """
+    src = tmp_path / dir_name
+    src.mkdir(exist_ok=True)
+    for n in names:
+        raw = json.loads((SPECS / "critter.json").read_text())
+        raw["name"] = n
+        raw["files"]["atlas"] = f"{n}.png"
+        if supersample is not None:
+            raw["layout"]["supersample"] = supersample
+        (src / f"{n}.json").write_text(json.dumps(raw, indent=2) + "\n")
+    return src
+
+
+def test_batch_flat_keeps_every_specs_sidecars(tmp_path: Path) -> None:
+    """Two specs in one flat directory used to share a single manifest/index.
+
+    The collision guard only checked `files.atlas`, so a batch of specs with
+    distinct atlases passed the guard, reported "2/2 ok", and then left one
+    `manifest.json` and one `index.ts` — the last spec's. The other spec's
+    metadata was gone, and its `index.ts` had been replaced by one requiring a
+    different atlas, so its frames were unreachable.
+    """
+    src = _flat_specs(tmp_path, ["a", "b"])
+    out = tmp_path / "flat"
+    r = runner.invoke(app, ["batch", str(src), "-o", str(out), "--flat"])
+    assert r.exit_code == 0, r.output
+    assert "2/2 specs ok" in r.output
+    # An unprefixed sidecar would be one spec overwriting another, not two
+    # specs each keeping their own.
+    assert not (out / "manifest.json").exists()
+    assert not (out / "index.ts").exists()
+    for n in ("a", "b"):
+        manifest = json.loads((out / f"{n}.manifest.json").read_text())
+        assert manifest["name"] == n, f"{n}.manifest.json belongs to another spec"
+        assert manifest["files"]["atlas"] == f"{n}.png"
+        # The index has to point at its own atlas or the frames are unreachable.
+        assert f"require('./{n}.png')" in (out / f"{n}.index.ts").read_text()
+
+
+def test_batch_flat_sidecars_survive_silhouette_texturepacker_and_shaders(
+        tmp_path: Path) -> None:
+    """Every shared sidecar name needs the stem, not just manifest and index.
+
+    `silhouette.png` is a fixed name, and the texturepacker sheet and the shader
+    are keyed on `spec.name` — which `--flat` deliberately allows to repeat. Two
+    specs in one flat directory must not overwrite any of them, and each
+    manifest has to name the files that were actually written.
+    """
+    src = _flat_specs(tmp_path, ["a", "b"], dir_name="flatspecs2")
+    for f in src.glob("*.json"):
+        raw = json.loads(f.read_text())
+        raw["runtime"] = {"freq": 0.05, "octaves": 4, "tileable": True}
+        f.write_text(json.dumps(raw, indent=2) + "\n")
+    out = tmp_path / "flat"
+    r = runner.invoke(app, ["batch", str(src), "-o", str(out), "--flat",
+                            "--silhouette", "--texturepacker"])
+    assert r.exit_code == 0, r.output
+    for n in ("a", "b"):
+        assert (out / f"{n}.silhouette.png").is_file()
+        assert (out / f"{n}.tpsheet.json").is_file()
+        assert (out / f"{n}.sksl").is_file()
+        manifest = json.loads((out / f"{n}.manifest.json").read_text())
+        assert manifest["files"].get("silhouette") == f"{n}.silhouette.png"
+        assert manifest["shader"]["file"] == f"{n}.sksl"
+
+
 def test_batch_flat_restores_the_old_shared_directory(tmp_path: Path) -> None:
     """--flat exists so the nested default cannot break existing setups.
 
@@ -321,7 +393,8 @@ def test_batch_flat_restores_the_old_shared_directory(tmp_path: Path) -> None:
     for n in ("a", "b"):
         assert (out / f"{n}.png").is_file(), f"expected the flat {n}.png"
         assert not (out / n).exists(), "flat mode must not create subdirectories"
-        assert (out / "manifest.json").is_file()
+        assert (out / f"{n}.manifest.json").is_file()
+        assert (out / f"{n}.index.ts").is_file()
 
 
 def test_batch_flat_refuses_a_shared_atlas_filename(tmp_path: Path) -> None:

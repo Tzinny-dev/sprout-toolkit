@@ -90,16 +90,30 @@ rather than letting them collide in the same subdirectory.
 depend on it:
 
 ```bash
-sprout batch specs/ --out ./out --flat    # -> ./out/atlas.png, ./out/manifest.json
+sprout batch specs/ --out ./out --flat    # -> ./out/atlas.png, ./out/atlas.manifest.json
 ```
 
 In flat mode the collision key is the atlas filename rather than the spec name,
 so `batch` refuses two specs that would write the same file — the nesting
-default refuses shared *names*, `--flat` refuses shared *filenames*. Neither
-mode silently overwrites an atlas.
+default refuses shared *names*, `--flat` refuses shared *filenames*.
 
-`watch --out` takes the same `--flat`, so the two commands cannot disagree about
-where a file lands.
+Atlases stay flat in `./out`, but everything that belongs to a spec takes the
+atlas stem as a prefix, because a shared directory would otherwise give every
+spec the same `manifest.json`, `index.ts` and `silhouette.png`, and the same
+`<name>.tpsheet.json` / `<name>.sksl` whenever two specs share a name:
+
+| written | belongs to |
+|---|---|
+| `atlas.png` | that spec — no prefix |
+| `atlas.manifest.json`, `atlas.index.ts` | that spec |
+| `atlas.silhouette.png` | `--silhouette` |
+| `atlas.tpsheet.json`, `atlas.sksl` | `--texturepacker`, and `runtime` specs |
+| `atlas@2x.png`, `atlas@4x.png` | `--mipmaps` |
+
+Mipmaps were already keyed on the atlas filename, which is why they need no
+prefix. Because each spec's `index.ts` requires its own atlas, every spec in a
+flat directory stays reachable instead of only the last one. `watch --out` takes
+the same `--flat`, so the two commands cannot disagree about where a file lands.
 
 ### `sprout watch <dir>`
 

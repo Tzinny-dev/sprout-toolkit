@@ -280,10 +280,17 @@ If your read paths break, you have two options:
 sprout batch specs/ --out ./out --flat
 ```
 
-`--flat` is the pre-0.4.0 layout, unchanged. It is safe to use while your
-atlas filenames differ, and `batch` refuses (exit 1, nothing written) if two
-specs would write the same file — so `--flat` cannot bring the silent data loss
-back. `watch --out` takes the same flag and the same rule.
+`--flat` puts every atlas straight into `./out` as before, and refuses (exit 1,
+nothing written) if two specs would write the same atlas file. Its other
+outputs take the atlas stem as a prefix — `./out/atlas.manifest.json`,
+`./out/atlas.index.ts`, and likewise for `--silhouette`, `--texturepacker` and
+`runtime` shaders — because one shared directory cannot hold two
+`manifest.json` files. `watch --out` takes the same flag and the same rule.
+
+> If you are on 0.4.0 and read `out/manifest.json` or `out/index.ts` from a
+> `--flat` batch with more than one spec, you were reading the last spec's file
+> and the others' metadata was already gone. 0.4.1 gives each spec its own; see
+> `CHANGELOG.md` for the rename.
 
 `generate --out` is **unchanged**: it never nested, so single-atlas setups
 should need no edits at all.

@@ -44,6 +44,7 @@ from .exporter import (
     render_items,
     resolve_supersample,
     shader_filename,
+    sidecar_name,
     texturepacker_filename,
     write_manifest,
     write_mipmap_files,
@@ -66,7 +67,8 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
               skip_existing: bool, png_mode: str = "rgba",
                texturepacker: bool = False, mipmaps: bool = False,
                mip_levels: int = 3, frame_px: int | None = None,
-               silhouette: bool = False, supersample: int | None = None) -> dict:
+               silhouette: bool = False, supersample: int | None = None,
+               sidecar_stem: str | None = None) -> dict:
     spec = load_spec(spec_path)
     if seed is not None:
         spec.seed = seed
@@ -83,16 +85,20 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
     out = out_dir if out_dir is not None else spec_path.parent
     atlas_name = spec.filename
     atlas_path = out / atlas_name
-    manifest_path = out / "manifest.json"
-    index_path = out / "index.ts"
-    tp_path = out / texturepacker_filename(spec) if texturepacker else None
-    sil_path = out / "silhouette.png" if silhouette else None
+    # `sidecar_stem` is set only by --flat, where every spec writes into one
+    # directory and the default names would collide.
+    manifest_path = out / sidecar_name("manifest.json", sidecar_stem)
+    index_path = out / sidecar_name("index.ts", sidecar_stem)
+    tp_path = (out / texturepacker_filename(spec, sidecar_stem)
+               if texturepacker else None)
+    sil_name = sidecar_name("silhouette.png", sidecar_stem)
+    sil_path = out / sil_name if silhouette else None
 
     autotile_map = build_autotile_map(spec, frames)
     font_map = build_font_map(spec, frames, supersample)
-    shader_source, shader_block = build_shader(spec)
-    shader_path = out / shader_filename(spec) if shader_block else None
-    tier_shaders = build_tier_shaders(spec)
+    shader_source, shader_block = build_shader(spec, sidecar_stem)
+    shader_path = out / shader_filename(spec, sidecar_stem) if shader_block else None
+    tier_shaders = build_tier_shaders(spec, sidecar_stem)
     tiers_block = (
         {name: {"file": t["file"], "template": t["template"],
                 "uniforms": t["uniforms"]}
@@ -103,7 +109,7 @@ def _generate(spec_path: Path, out_dir: Path | None, seed: int | None,
     manifest = build_manifest(spec, records, atlas_name, sheet, str(spec_path),
                               autotile_map, shader_block, font_map,
                               {"levels": mip_meta} if mip_meta else None,
-                              "silhouette.png" if silhouette else None,
+                              sil_name if silhouette else None,
                               tiers_block, supersample)
 
     if skip_existing and atlas_path.is_file() and manifest_path.is_file() and index_path.is_file():
@@ -304,19 +310,21 @@ def batch(
     # reported 13/13 ok and left a single atlas holding the last spec. Each spec
     # gets a subdirectory named after it, so a common --out is lossless.
     named: list[tuple[Path, str]] = []
+    specs: dict[Path, Spec] = {}
     for f in files:
         try:
-            named.append((f, load_spec(f).name))
+            s = load_spec(f)
+            specs[f] = s
+            named.append((f, s.name))
         except SpecError as e:
             typer.secho(f"error in {f}: {e}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1)
     if out is not None:
         # What collides depends on the layout: nesting keys on the spec name,
         # the flat layout keys on the atlas filename it actually writes.
-        spec_of = dict(named)
         keys: list[tuple[Path, str, str]]
         if flat:
-            keys = [(f, load_spec(f).filename, n) for f, n in named]
+            keys = [(f, specs[f].filename, n) for f, n in named]
         else:
             keys = [(f, n, n) for f, n in named]
         seen: dict[str, Path] = {}
@@ -346,10 +354,13 @@ def batch(
     failed = 0
     for f, name in named:
         dest = None if out is None else (out if flat else out / name)
+        # Flat shares one directory, so each spec's sidecars carry its atlas
+        # stem to keep `manifest.json`/`index.ts` from being overwritten.
+        stem = Path(specs[f].filename).stem if flat else None
         try:
             _generate(f, dest, None, skip_existing, png_mode, texturepacker,
                       mipmaps, mipmap_levels, silhouette=silhouette,
-                      supersample=supersample)
+                      supersample=supersample, sidecar_stem=stem)
         except SpecError as e:
             typer.secho(f"error in {f}: {e}", fg=typer.colors.RED, err=True)
             failed += 1
@@ -803,15 +814,17 @@ def watch(
     # calls its atlas atlas.png and a shared --out would keep only the last.
     names: dict[str, Path] = {}
     watched: dict[Path, str] = {}
+    stems: dict[Path, str] = {}
     for f in sorted(specs_dir.glob("*.json")):
         try:
-            name = load_spec(f).name
+            spec = load_spec(f)
+            name = spec.name
         except SpecError as e:
             typer.secho(f"  [error] {f.name}: {e}", fg=typer.colors.RED, err=True)
             continue
         # In flat mode the collision key is the atlas filename actually written,
         # not the spec name; in nested mode it is the spec name.
-        key = load_spec(f).filename if flat else name
+        key = spec.filename if flat else name
         if key in names:
             typer.secho(
                 f"  [error] {f.name}: shares the "
@@ -823,6 +836,9 @@ def watch(
         else:
             names[key] = f
             watched[f] = name
+            # Flat shares one directory: sidecars need the atlas stem to stay apart.
+            if flat:
+                stems[f] = Path(spec.filename).stem
     mtimes: dict[Path, float] = {}
     first = True
     try:
@@ -842,7 +858,7 @@ def watch(
                 try:
                     dest = None if out is None else (
                         out if flat else out / watched[f])
-                    r = _generate(f, dest, None, True)
+                    r = _generate(f, dest, None, True, sidecar_stem=stems.get(f))
                 except SpecError as e:
                     typer.secho(f"  [error] {f.name}: {e}", fg=typer.colors.RED, err=True)
                     continue
